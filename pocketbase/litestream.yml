@@ -1,0 +1,15 @@
+dbs:
+  - path: /pb/pb_data/data.db
+    replicas:
+      - type: s3
+        endpoint: ${S3_ENDPOINT}
+        bucket: ${S3_BUCKET}
+        path: pb/data.db
+        region: ${S3_REGION}
+        force-path-style: true
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        sync-interval: 1s
+        snapshot-interval: 24h
+        retention: 72h
+        retention-check-interval: 1h

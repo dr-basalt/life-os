@@ -1,0 +1,24 @@
+version: "3.9"
+
+# Override pour dev local — ports directs, pas de Traefik, pas de HTTPS
+services:
+  pocketbase:
+    ports:
+      - "8090:8090"
+    labels:
+      - "traefik.enable=false"
+
+  frontend:
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=false"
+
+  windmill:
+    ports:
+      - "8000:8000"
+    labels:
+      - "traefik.enable=false"
+
+  traefik:
+    profiles: ["disabled"]

@@ -1,0 +1,111 @@
+version: "3.9"
+
+services:
+  # ─── PocketBase + Litestream ────────────────────────────────────────────────
+  pocketbase:
+    build: ./pocketbase
+    container_name: lifeos-pb
+    restart: unless-stopped
+    environment:
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION:-auto}
+      LITESTREAM_ACCESS_KEY_ID: ${S3_KEY}
+      LITESTREAM_SECRET_ACCESS_KEY: ${S3_SECRET}
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+    volumes:
+      - pb_data:/pb/pb_data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pb.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.pb.entrypoints=websecure"
+      - "traefik.http.routers.pb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.pb.loadbalancer.server.port=8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─── SvelteKit Frontend ─────────────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: lifeos-frontend
+    restart: unless-stopped
+    environment:
+      PUBLIC_PB_URL: https://api.${DOMAIN}
+      ORIGIN: https://${DOMAIN}
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+
+  # ─── Windmill (Agent Orchestration) ────────────────────────────────────────
+  windmill:
+    image: ghcr.io/windmill-labs/windmill:main
+    container_name: lifeos-windmill
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://windmill:${WM_DB_PASS}@windmill_db/windmill
+      BASE_URL: https://flows.${DOMAIN}
+      NUM_WORKERS: 2
+    depends_on:
+      windmill_db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.windmill.rule=Host(`flows.${DOMAIN}`)"
+      - "traefik.http.routers.windmill.entrypoints=websecure"
+      - "traefik.http.routers.windmill.tls.certresolver=letsencrypt"
+      - "traefik.http.services.windmill.loadbalancer.server.port=8000"
+
+  windmill_db:
+    image: postgres:16-alpine
+    container_name: lifeos-windmill-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: windmill
+      POSTGRES_USER: windmill
+      POSTGRES_PASSWORD: ${WM_DB_PASS}
+    volumes:
+      - wm_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U windmill"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Traefik ────────────────────────────────────────────────────────────────
+  traefik:
+    image: traefik:v3
+    container_name: lifeos-traefik
+    restart: unless-stopped
+    command:
+      - "--log.level=INFO"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - acme_data:/acme
+
+volumes:
+  pb_data:
+  wm_pg_data:
+  acme_data:
