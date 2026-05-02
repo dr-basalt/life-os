@@ -1,0 +1,94 @@
+version: "3.9"
+
+# ── Déploiement o3c — cockpit.infra.ori3com.cloud ─────────────────────────────
+# Utilise le Traefik existant (/data/docker-compose.yml)
+# Network externe : traefik
+# Cert resolver : le (Cloudflare DNS challenge)
+#
+# Démarrage :
+#   cp .env.o3c .env
+#   docker compose -f docker-compose.o3c.yml up -d
+
+services:
+  # ── PocketBase + Litestream ─────────────────────────────────────────────────
+  lifeos-pb:
+    build: ./pocketbase
+    container_name: lifeos-pb
+    restart: unless-stopped
+    environment:
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION:-auto}
+      LITESTREAM_ACCESS_KEY_ID: ${S3_KEY}
+      LITESTREAM_SECRET_ACCESS_KEY: ${S3_SECRET}
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+    volumes:
+      - lifeos_pb_data:/pb/pb_data
+    networks:
+      - traefik
+      - lifeos_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      # API PocketBase
+      - "traefik.http.routers.lifeos-api.rule=Host(`api-cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.lifeos-api.entrypoints=websecure"
+      - "traefik.http.routers.lifeos-api.tls.certresolver=le"
+      - "traefik.http.services.lifeos-api.loadbalancer.server.port=8090"
+      # Admin PocketBase (optionnel — à désactiver en prod si non nécessaire)
+      - "traefik.http.routers.lifeos-admin.rule=Host(`pb-cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.lifeos-admin.entrypoints=websecure"
+      - "traefik.http.routers.lifeos-admin.tls.certresolver=le"
+      - "traefik.http.services.lifeos-admin.loadbalancer.server.port=8090"
+      # Middleware basic auth sur l'admin PB
+      - "traefik.http.routers.lifeos-admin.middlewares=lifeos-auth"
+      - "traefik.http.middlewares.lifeos-auth.basicauth.users=${PB_BASIC_AUTH}"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  # ── SvelteKit Frontend ──────────────────────────────────────────────────────
+  lifeos-frontend:
+    build:
+      context: ./frontend
+      args:
+        PUBLIC_PB_URL: https://api-cockpit.infra.ori3com.cloud
+    container_name: lifeos-frontend
+    restart: unless-stopped
+    environment:
+      ORIGIN: https://cockpit.infra.ori3com.cloud
+      PUBLIC_PB_URL: https://api-cockpit.infra.ori3com.cloud
+    depends_on:
+      lifeos-pb:
+        condition: service_healthy
+    networks:
+      - traefik
+      - lifeos_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.lifeos-app.rule=Host(`cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.lifeos-app.entrypoints=websecure"
+      - "traefik.http.routers.lifeos-app.tls.certresolver=le"
+      - "traefik.http.services.lifeos-app.loadbalancer.server.port=3000"
+
+  # ── DB interne Windmill (optionnel — si tu veux Windmill en plus de n8n) ───
+  # Sinon : pointe tes agents sur n8n1890.infra.ori3com.cloud (déjà running)
+  #
+  # lifeos-windmill:
+  #   image: ghcr.io/windmill-labs/windmill:main
+  #   ...
+
+volumes:
+  lifeos_pb_data:
+    name: lifeos_pb_data
+
+networks:
+  traefik:
+    external: true        # réseau Traefik existant
+  lifeos_internal:
+    name: lifeos_internal # réseau privé inter-services
