@@ -23,7 +23,8 @@ RUN wget -q \
 
 COPY litestream.yml /etc/litestream.yml
 COPY entrypoint.sh /entrypoint.sh
-COPY pb_migrations/ /pb/pb_migrations/
+# pb_migrations skipped — collections created via admin UI on first run
+# TODO: rewrite migrations for PocketBase v0.22 DB builder API
 
 RUN chmod +x /entrypoint.sh
 
