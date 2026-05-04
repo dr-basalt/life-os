@@ -29,10 +29,10 @@ services:
       - "8090"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 45s
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
 
   # ── SvelteKit Frontend ──────────────────────────────────────────────────────
   lifeos-frontend:
@@ -46,7 +46,7 @@ services:
       PUBLIC_PB_URL: ${PUBLIC_PB_URL:-https://api-cockpit.infra.ori3com.cloud}
     depends_on:
       lifeos-pb:
-        condition: service_healthy
+        condition: service_started
     networks:
       - lifeos_internal
     expose:
