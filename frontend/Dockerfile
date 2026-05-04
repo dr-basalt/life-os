@@ -21,11 +21,10 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copier uniquement le build + node_modules de prod
+# Copier le build + node_modules du builder (évite npm install en prod)
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
-
-RUN npm install --omit=dev --frozen-lockfile 2>/dev/null || npm install --omit=dev
+COPY --from=builder /app/node_modules ./node_modules
 
 ENV NODE_ENV=production
 ENV PORT=3000
