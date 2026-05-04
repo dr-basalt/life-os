@@ -26,13 +26,13 @@
   }
 </script>
 
-<svelte:head><title>Life OS — Connexion</title></svelte:head>
+<svelte:head><title>Stern OS — Connexion</title></svelte:head>
 
 <div class="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
   <div class="w-full max-w-sm">
     <div class="text-center mb-8">
       <div class="text-4xl mb-3">◈</div>
-      <h1 class="text-2xl font-bold text-white">Life OS</h1>
+      <h1 class="text-2xl font-bold text-white">Stern OS</h1>
       <p class="text-zinc-500 text-sm mt-1">Ton cockpit de vie</p>
     </div>
 

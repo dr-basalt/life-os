@@ -4,11 +4,11 @@ version: "3.9"
 # Proxy : Traefik (réseau externe 'coolify')
 # FQDNs :
 #   cockpit.infra.ori3com.cloud       → frontend:3000
-#   api-cockpit.infra.ori3com.cloud   → lifeos-pb:8090
+#   api-cockpit.infra.ori3com.cloud   → sternos-pb:8090
 
 services:
   # ── PocketBase ───────────────────────────────────────────────────────────────
-  lifeos-pb:
+  sternos-pb:
     build: ./pocketbase
     restart: unless-stopped
     environment:
@@ -20,22 +20,22 @@ services:
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
     volumes:
-      - lifeos_pb_data:/pb/pb_data
+      - sternos_pb_data:/pb/pb_data
     networks:
       - coolify
-      - lifeos_internal
+      - sternos_internal
     expose:
       - "8090"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.lifeos-api.rule=Host(`api-cockpit.infra.ori3com.cloud`)"
-      - "traefik.http.routers.lifeos-api.entrypoints=https"
-      - "traefik.http.routers.lifeos-api.tls=true"
-      - "traefik.http.routers.lifeos-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.lifeos-api.loadbalancer.server.port=8090"
+      - "traefik.http.routers.sternos-api.rule=Host(`api-cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.sternos-api.entrypoints=https"
+      - "traefik.http.routers.sternos-api.tls=true"
+      - "traefik.http.routers.sternos-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sternos-api.loadbalancer.server.port=8090"
 
   # ── SvelteKit Frontend ──────────────────────────────────────────────────────
-  lifeos-frontend:
+  sternos-frontend:
     build:
       context: ./frontend
       args:
@@ -46,26 +46,26 @@ services:
       PUBLIC_PB_URL: ${PUBLIC_PB_URL:-https://api-cockpit.infra.ori3com.cloud}
     networks:
       - coolify
-      - lifeos_internal
+      - sternos_internal
     expose:
       - "3000"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.lifeos-app-http.rule=Host(`cockpit.infra.ori3com.cloud`)"
-      - "traefik.http.routers.lifeos-app-http.entrypoints=http"
-      - "traefik.http.routers.lifeos-app-http.middlewares=redirect-to-https"
-      - "traefik.http.routers.lifeos-app.rule=Host(`cockpit.infra.ori3com.cloud`)"
-      - "traefik.http.routers.lifeos-app.entrypoints=https"
-      - "traefik.http.routers.lifeos-app.tls=true"
-      - "traefik.http.routers.lifeos-app.tls.certresolver=letsencrypt"
-      - "traefik.http.services.lifeos-app.loadbalancer.server.port=3000"
+      - "traefik.http.routers.sternos-app-http.rule=Host(`cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.sternos-app-http.entrypoints=http"
+      - "traefik.http.routers.sternos-app-http.middlewares=redirect-to-https"
+      - "traefik.http.routers.sternos-app.rule=Host(`cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.sternos-app.entrypoints=https"
+      - "traefik.http.routers.sternos-app.tls=true"
+      - "traefik.http.routers.sternos-app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sternos-app.loadbalancer.server.port=3000"
 
 volumes:
-  lifeos_pb_data:
-    name: lifeos_pb_data
+  sternos_pb_data:
+    name: sternos_pb_data
 
 networks:
   coolify:
     external: true
-  lifeos_internal:
-    name: lifeos_internal
+  sternos_internal:
+    name: sternos_internal

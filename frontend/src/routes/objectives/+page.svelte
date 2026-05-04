@@ -18,7 +18,7 @@
   }
 </script>
 
-<svelte:head><title>Life OS — OKRs</title></svelte:head>
+<svelte:head><title>Stern OS — OKRs</title></svelte:head>
 
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-xl font-bold text-zinc-100">Objectifs & Key Results</h1>

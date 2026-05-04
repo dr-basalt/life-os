@@ -4,7 +4,7 @@ services:
   # ─── PocketBase + Litestream ────────────────────────────────────────────────
   pocketbase:
     build: ./pocketbase
-    container_name: lifeos-pb
+    container_name: sternos-pb
     restart: unless-stopped
     environment:
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -32,7 +32,7 @@ services:
   # ─── SvelteKit Frontend ─────────────────────────────────────────────────────
   frontend:
     build: ./frontend
-    container_name: lifeos-frontend
+    container_name: sternos-frontend
     restart: unless-stopped
     environment:
       PUBLIC_PB_URL: https://api.${DOMAIN}
@@ -50,7 +50,7 @@ services:
   # ─── Windmill (Agent Orchestration) ────────────────────────────────────────
   windmill:
     image: ghcr.io/windmill-labs/windmill:main
-    container_name: lifeos-windmill
+    container_name: sternos-windmill
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://windmill:${WM_DB_PASS}@windmill_db/windmill
@@ -68,7 +68,7 @@ services:
 
   windmill_db:
     image: postgres:16-alpine
-    container_name: lifeos-windmill-db
+    container_name: sternos-windmill-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: windmill
@@ -85,7 +85,7 @@ services:
   # ─── Traefik ────────────────────────────────────────────────────────────────
   traefik:
     image: traefik:v3
-    container_name: lifeos-traefik
+    container_name: sternos-traefik
     restart: unless-stopped
     command:
       - "--log.level=INFO"

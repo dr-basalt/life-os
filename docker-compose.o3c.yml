@@ -11,9 +11,9 @@ version: "3.9"
 
 services:
   # ── PocketBase + Litestream ─────────────────────────────────────────────────
-  lifeos-pb:
+  sternos-pb:
     build: ./pocketbase
-    container_name: lifeos-pb
+    container_name: sternos-pb
     restart: unless-stopped
     environment:
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -24,26 +24,26 @@ services:
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
     volumes:
-      - lifeos_pb_data:/pb/pb_data
+      - sternos_pb_data:/pb/pb_data
     networks:
       - traefik
-      - lifeos_internal
+      - sternos_internal
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       # API PocketBase
-      - "traefik.http.routers.lifeos-api.rule=Host(`api-cockpit.infra.ori3com.cloud`)"
-      - "traefik.http.routers.lifeos-api.entrypoints=websecure"
-      - "traefik.http.routers.lifeos-api.tls.certresolver=le"
-      - "traefik.http.services.lifeos-api.loadbalancer.server.port=8090"
+      - "traefik.http.routers.sternos-api.rule=Host(`api-cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.sternos-api.entrypoints=websecure"
+      - "traefik.http.routers.sternos-api.tls.certresolver=le"
+      - "traefik.http.services.sternos-api.loadbalancer.server.port=8090"
       # Admin PocketBase (optionnel — à désactiver en prod si non nécessaire)
-      - "traefik.http.routers.lifeos-admin.rule=Host(`pb-cockpit.infra.ori3com.cloud`)"
-      - "traefik.http.routers.lifeos-admin.entrypoints=websecure"
-      - "traefik.http.routers.lifeos-admin.tls.certresolver=le"
-      - "traefik.http.services.lifeos-admin.loadbalancer.server.port=8090"
+      - "traefik.http.routers.sternos-admin.rule=Host(`pb-cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.sternos-admin.entrypoints=websecure"
+      - "traefik.http.routers.sternos-admin.tls.certresolver=le"
+      - "traefik.http.services.sternos-admin.loadbalancer.server.port=8090"
       # Middleware basic auth sur l'admin PB
-      - "traefik.http.routers.lifeos-admin.middlewares=lifeos-auth"
-      - "traefik.http.middlewares.lifeos-auth.basicauth.users=${PB_BASIC_AUTH}"
+      - "traefik.http.routers.sternos-admin.middlewares=sternos-auth"
+      - "traefik.http.middlewares.sternos-auth.basicauth.users=${PB_BASIC_AUTH}"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
       interval: 15s
@@ -52,43 +52,43 @@ services:
       start_period: 45s
 
   # ── SvelteKit Frontend ──────────────────────────────────────────────────────
-  lifeos-frontend:
+  sternos-frontend:
     build:
       context: ./frontend
       args:
         PUBLIC_PB_URL: https://api-cockpit.infra.ori3com.cloud
-    container_name: lifeos-frontend
+    container_name: sternos-frontend
     restart: unless-stopped
     environment:
       ORIGIN: https://cockpit.infra.ori3com.cloud
       PUBLIC_PB_URL: https://api-cockpit.infra.ori3com.cloud
     depends_on:
-      lifeos-pb:
+      sternos-pb:
         condition: service_healthy
     networks:
       - traefik
-      - lifeos_internal
+      - sternos_internal
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.lifeos-app.rule=Host(`cockpit.infra.ori3com.cloud`)"
-      - "traefik.http.routers.lifeos-app.entrypoints=websecure"
-      - "traefik.http.routers.lifeos-app.tls.certresolver=le"
-      - "traefik.http.services.lifeos-app.loadbalancer.server.port=3000"
+      - "traefik.http.routers.sternos-app.rule=Host(`cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.sternos-app.entrypoints=websecure"
+      - "traefik.http.routers.sternos-app.tls.certresolver=le"
+      - "traefik.http.services.sternos-app.loadbalancer.server.port=3000"
 
   # ── DB interne Windmill (optionnel — si tu veux Windmill en plus de n8n) ───
   # Sinon : pointe tes agents sur n8n1890.infra.ori3com.cloud (déjà running)
   #
-  # lifeos-windmill:
+  # sternos-windmill:
   #   image: ghcr.io/windmill-labs/windmill:main
   #   ...
 
 volumes:
-  lifeos_pb_data:
-    name: lifeos_pb_data
+  sternos_pb_data:
+    name: sternos_pb_data
 
 networks:
   traefik:
     external: true        # réseau Traefik existant
-  lifeos_internal:
-    name: lifeos_internal # réseau privé inter-services
+  sternos_internal:
+    name: sternos_internal # réseau privé inter-services

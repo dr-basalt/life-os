@@ -28,7 +28,7 @@
   $: avgImpact = $victories.length ? (totalImpact / $victories.length).toFixed(1) : '0'
 </script>
 
-<svelte:head><title>Life OS — Victoires</title></svelte:head>
+<svelte:head><title>Stern OS — Victoires</title></svelte:head>
 
 <div class="max-w-2xl mx-auto">
   <div class="flex items-center justify-between mb-6">

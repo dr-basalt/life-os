@@ -4,18 +4,18 @@
 // API disponible : newQuery, insert, upsert, createTable, addColumn, etc.
 
 const IDS = {
-  objectives:    "lifeosobjective",
-  keyResults:    "lifeosk0result1",
-  projects:      "lifeosproj00001",
-  tasks:         "lifeostask00001",
-  victories:     "lifeosvictory01",
-  metrics:       "lifeosmetrics01",
-  metricEntries: "lifeosment00001",
-  deadlines:     "lifeosdead00001",
-  agents:        "lifeosagent0001",
-  tools:         "lifeostool00001",
-  agentRuns:     "lifeosruns00001",
-  focusSessions: "lifeosfocus0001",
+  objectives:    "sternosobjective",
+  keyResults:    "sternosk0result1",
+  projects:      "sternosproj00001",
+  tasks:         "sternostask00001",
+  victories:     "sternosvictory01",
+  metrics:       "sternosmetrics01",
+  metricEntries: "sternosment00001",
+  deadlines:     "sternosdead00001",
+  agents:        "sternosagent0001",
+  tools:         "sternostool00001",
+  agentRuns:     "sternosruns00001",
+  focusSessions: "sternosfocus0001",
 }
 
 // Construit la def de colonne SQL pour chaque type de champ

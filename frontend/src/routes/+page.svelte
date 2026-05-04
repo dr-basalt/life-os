@@ -20,7 +20,7 @@
   $: overdueCount = $deadlines.filter(d => daysUntil(d.due_at) < 0).length
 </script>
 
-<svelte:head><title>Life OS — Dashboard</title></svelte:head>
+<svelte:head><title>Stern OS — Dashboard</title></svelte:head>
 
 {#if $loading}
   <div class="flex items-center justify-center h-32">

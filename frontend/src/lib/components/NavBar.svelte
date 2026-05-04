@@ -14,7 +14,7 @@
   <!-- Logo -->
   <a href="/" class="flex items-center gap-2 font-bold text-white shrink-0">
     <span class="text-indigo-400 text-xl">◈</span>
-    <span class="hidden sm:block text-sm">Life OS</span>
+    <span class="hidden sm:block text-sm">Stern OS</span>
   </a>
 
   <div class="flex-1" />

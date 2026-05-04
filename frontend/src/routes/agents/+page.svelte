@@ -71,12 +71,12 @@
   }
 </script>
 
-<svelte:head><title>Life OS — Agents</title></svelte:head>
+<svelte:head><title>Stern OS — Agents</title></svelte:head>
 
 <div class="flex items-center justify-between mb-6">
   <div>
     <h1 class="text-xl font-bold text-zinc-100">⬟ Agents</h1>
-    <p class="text-xs text-zinc-500 mt-0.5">Automatisations connectées à ton Life OS</p>
+    <p class="text-xs text-zinc-500 mt-0.5">Automatisations connectées à ton Stern OS</p>
   </div>
   <button class="btn btn-primary text-sm" on:click={() => showForm = !showForm}>
     {showForm ? '✕' : '+ Agent'}
