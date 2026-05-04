@@ -4,7 +4,10 @@ import { fileURLToPath } from 'url'
 import yaml from 'js-yaml'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const CONSTITUTION_PATH = resolve(__dirname, '../../constitution/AGENT_CONSTITUTION.yaml')
+const PROJECT_PATH = process.env.PROJECT_PATH || '/opt/stern-os'
+const CONSTITUTION_PATH = process.env.CONSTITUTION_PATH
+  || resolve(PROJECT_PATH, 'constitution/AGENT_CONSTITUTION.yaml')
+  || resolve(__dirname, '../../constitution/AGENT_CONSTITUTION.yaml')
 
 export function loadConstitution() {
   const raw = readFileSync(CONSTITUTION_PATH, 'utf-8')
