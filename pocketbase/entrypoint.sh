@@ -23,5 +23,5 @@ if [ -n "$S3_BUCKET" ] && [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$LITESTREA
     -exec "/pb/pocketbase serve --http=0.0.0.0:8090 --dir=$PB_DATA --automigrate"
 else
   echo "[entrypoint] No S3 — starting PocketBase directly"
-  exec /pb/pocketbase serve --http=0.0.0.0:8090 --dir="$PB_DATA"
+  exec /pb/pocketbase serve --http=0.0.0.0:8090 --dir="$PB_DATA" --automigrate
 fi

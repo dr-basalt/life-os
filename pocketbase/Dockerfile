@@ -35,8 +35,7 @@ RUN case "$(uname -m)" in \
 
 COPY litestream.yml /etc/litestream.yml
 COPY entrypoint.sh /entrypoint.sh
-# pb_migrations skipped — collections created via admin UI on first run
-# TODO: rewrite migrations for PocketBase v0.22 DB builder API
+COPY pb_migrations/ /pb/pb_migrations/
 
 RUN chmod +x /entrypoint.sh
 
