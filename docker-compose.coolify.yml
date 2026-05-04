@@ -1,12 +1,10 @@
 version: "3.9"
 
 # ── Déploiement via Coolify sur taz-jarvis-hetzner ────────────────────────────
-# Pas de réseau traefik externe — Coolify injecte son propre réseau.
-# Routing géré par Coolify (Caddy) via FQDN configuré dans l'UI.
-#
-# FQDNs configurés dans Coolify :
-#   cockpit.infra.ori3com.cloud        → frontend:3000
-#   api-cockpit.infra.ori3com.cloud    → lifeos-pb:8090  (app séparée à créer)
+# Proxy : Caddy (réseau externe 'coolify')
+# FQDNs :
+#   cockpit.infra.ori3com.cloud       → frontend:3000
+#   api-cockpit.infra.ori3com.cloud   → lifeos-pb:8090
 
 services:
   # ── PocketBase + Litestream ─────────────────────────────────────────────────
@@ -24,9 +22,16 @@ services:
     volumes:
       - lifeos_pb_data:/pb/pb_data
     networks:
+      - coolify
       - lifeos_internal
     expose:
       - "8090"
+    labels:
+      - "caddy_1=https://api-cockpit.infra.ori3com.cloud"
+      - "caddy_1.handle_path=/*"
+      - "caddy_1.handle_path.0_reverse_proxy={{upstreams 8090}}"
+      - "caddy_1.header=-Server"
+      - "caddy_ingress_network=coolify"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
       interval: 20s
@@ -48,14 +53,24 @@ services:
       lifeos-pb:
         condition: service_started
     networks:
+      - coolify
       - lifeos_internal
     expose:
       - "3000"
+    labels:
+      - "caddy_0=https://cockpit.infra.ori3com.cloud"
+      - "caddy_0.encode=zstd gzip"
+      - "caddy_0.handle_path=/*"
+      - "caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}"
+      - "caddy_0.header=-Server"
+      - "caddy_ingress_network=coolify"
 
 volumes:
   lifeos_pb_data:
     name: lifeos_pb_data
 
 networks:
+  coolify:
+    external: true
   lifeos_internal:
     name: lifeos_internal
