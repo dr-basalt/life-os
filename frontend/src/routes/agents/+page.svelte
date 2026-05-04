@@ -117,7 +117,7 @@
     <div>
       <label class="text-xs text-zinc-500 block mb-1">Config JSON</label>
       <textarea bind:value={newAgent.config} class="input font-mono text-xs" rows="3"
-        placeholder='{"url": "https://...", "workflowId": "...", "apiKey": "..."}'></textarea>
+        placeholder="Exemple: url, workflowId, apiKey..."></textarea>
     </div>
     <button class="btn btn-primary w-full justify-center" on:click={createAgent} disabled={submitting || !newAgent.name.trim()}>
       {submitting ? 'Création...' : '✓ Créer l\'agent'}
