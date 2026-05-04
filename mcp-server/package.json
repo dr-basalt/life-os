@@ -1,0 +1,16 @@
+{
+  "name": "sternos-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "build": "tsc",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "hono": "^4.4.0",
+    "@hono/node-server": "^1.11.1",
+    "neo4j-driver": "^5.21.0",
+    "pocketbase": "^0.21.3"
+  }
+}

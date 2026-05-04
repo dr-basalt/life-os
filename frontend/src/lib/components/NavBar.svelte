@@ -2,11 +2,15 @@
   import { page } from '$app/stores'
 
   const links = [
-    { href: '/',           label: 'Dashboard', icon: '⬡' },
-    { href: '/objectives', label: 'OKRs',      icon: '◎' },
-    { href: '/victories',  label: 'Victoires', icon: '⚡' },
-    { href: '/metrics',    label: 'Métriques', icon: '◈' },
-    { href: '/agents',     label: 'Agents',    icon: '⬟' },
+    { href: '/',            label: 'Dashboard', icon: '⬡' },
+    { href: '/objectives',  label: 'OKRs',      icon: '◎' },
+    { href: '/board',       label: 'Board',     icon: '⊞' },
+    { href: '/canvas',      label: 'Canvas',    icon: '◌' },
+    { href: '/victories',   label: 'Victoires', icon: '⚡' },
+    { href: '/metrics',     label: 'Métriques', icon: '◈' },
+    { href: '/mindset',     label: 'Mindset',   icon: '◉' },
+    { href: '/agents',      label: 'Agents',    icon: '⬟' },
+    { href: '/onboarding',  label: 'Onboarding',icon: '✦' },
   ]
 </script>
 
