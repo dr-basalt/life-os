@@ -54,6 +54,5 @@ else
   echo "[entrypoint] Démarrage sans réplication S3"
   exec /pb/pocketbase serve \
     --http=0.0.0.0:8090 \
-    --dir="$PB_DATA" \
-    --automigrate
+    --dir="$PB_DATA"
 fi
