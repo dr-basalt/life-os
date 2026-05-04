@@ -25,7 +25,7 @@ migrate((app) => {
   } catch (_) {}
 
   // ── 1. Objectives ────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.objectives,
     name: "objectives",
     type: "base",
@@ -43,7 +43,7 @@ migrate((app) => {
   }))
 
   // ── 2. Key Results ───────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.keyResults,
     name: "key_results",
     type: "base",
@@ -63,7 +63,7 @@ migrate((app) => {
   }))
 
   // ── 3. Projects ──────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.projects,
     name: "projects",
     type: "base",
@@ -82,7 +82,7 @@ migrate((app) => {
   }))
 
   // ── 4. Tasks ─────────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.tasks,
     name: "tasks",
     type: "base",
@@ -102,7 +102,7 @@ migrate((app) => {
   }))
 
   // ── 5. Victories ─────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.victories,
     name: "victories",
     type: "base",
@@ -119,7 +119,7 @@ migrate((app) => {
   }))
 
   // ── 6. Metrics ───────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.metrics,
     name: "metrics",
     type: "base",
@@ -137,7 +137,7 @@ migrate((app) => {
   }))
 
   // ── 7. Metric Entries ────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.metricEntries,
     name: "metric_entries",
     type: "base",
@@ -151,7 +151,7 @@ migrate((app) => {
   }))
 
   // ── 8. Deadlines ─────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.deadlines,
     name: "deadlines",
     type: "base",
@@ -169,7 +169,7 @@ migrate((app) => {
   }))
 
   // ── 9. Agents ────────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.agents,
     name: "agents",
     type: "base",
@@ -188,7 +188,7 @@ migrate((app) => {
   }))
 
   // ── 10. Tools ────────────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.tools,
     name: "tools",
     type: "base",
@@ -205,7 +205,7 @@ migrate((app) => {
   }))
 
   // ── 11. Agent Runs ───────────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.agentRuns,
     name: "agent_runs",
     type: "base",
@@ -222,7 +222,7 @@ migrate((app) => {
   }))
 
   // ── 12. Focus Sessions ───────────────────────────────────────────────────────
-  app.save(new Collection({
+  app.saveCollection(new Collection({
     id:   IDS.focusSessions,
     name: "focus_sessions",
     type: "base",
@@ -247,7 +247,7 @@ migrate((app) => {
   ]
   for (const name of names) {
     try {
-      app.delete(app.findCollectionByNameOrId(name))
+      app.deleteCollection(app.findCollectionByNameOrId(name))
     } catch (_) {}
   }
 })
