@@ -1,0 +1,61 @@
+version: "3.9"
+
+# ── Déploiement via Coolify sur taz-jarvis-hetzner ────────────────────────────
+# Pas de réseau traefik externe — Coolify injecte son propre réseau.
+# Routing géré par Coolify (Caddy) via FQDN configuré dans l'UI.
+#
+# FQDNs configurés dans Coolify :
+#   cockpit.infra.ori3com.cloud        → frontend:3000
+#   api-cockpit.infra.ori3com.cloud    → lifeos-pb:8090  (app séparée à créer)
+
+services:
+  # ── PocketBase + Litestream ─────────────────────────────────────────────────
+  lifeos-pb:
+    build: ./pocketbase
+    restart: unless-stopped
+    environment:
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-auto}
+      LITESTREAM_ACCESS_KEY_ID: ${S3_KEY:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${S3_SECRET:-}
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+    volumes:
+      - lifeos_pb_data:/pb/pb_data
+    networks:
+      - lifeos_internal
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  # ── SvelteKit Frontend ──────────────────────────────────────────────────────
+  lifeos-frontend:
+    build:
+      context: ./frontend
+      args:
+        PUBLIC_PB_URL: ${PUBLIC_PB_URL:-https://api-cockpit.infra.ori3com.cloud}
+    restart: unless-stopped
+    environment:
+      ORIGIN: ${ORIGIN:-https://cockpit.infra.ori3com.cloud}
+      PUBLIC_PB_URL: ${PUBLIC_PB_URL:-https://api-cockpit.infra.ori3com.cloud}
+    depends_on:
+      lifeos-pb:
+        condition: service_healthy
+    networks:
+      - lifeos_internal
+    expose:
+      - "3000"
+
+volumes:
+  lifeos_pb_data:
+    name: lifeos_pb_data
+
+networks:
+  lifeos_internal:
+    name: lifeos_internal
