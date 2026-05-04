@@ -1,13 +1,13 @@
 version: "3.9"
 
 # ── Déploiement via Coolify sur taz-jarvis-hetzner ────────────────────────────
-# Proxy : Caddy (réseau externe 'coolify')
+# Proxy : Traefik (réseau externe 'coolify')
 # FQDNs :
 #   cockpit.infra.ori3com.cloud       → frontend:3000
 #   api-cockpit.infra.ori3com.cloud   → lifeos-pb:8090
 
 services:
-  # ── PocketBase + Litestream ─────────────────────────────────────────────────
+  # ── PocketBase ───────────────────────────────────────────────────────────────
   lifeos-pb:
     build: ./pocketbase
     restart: unless-stopped
@@ -27,11 +27,12 @@ services:
     expose:
       - "8090"
     labels:
-      - "caddy_1=https://api-cockpit.infra.ori3com.cloud"
-      - "caddy_1.handle_path=/*"
-      - "caddy_1.handle_path.0_reverse_proxy={{upstreams 8090}}"
-      - "caddy_1.header=-Server"
-      - "caddy_ingress_network=coolify"
+      - "traefik.enable=true"
+      - "traefik.http.routers.lifeos-api.rule=Host(`api-cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.lifeos-api.entrypoints=https"
+      - "traefik.http.routers.lifeos-api.tls=true"
+      - "traefik.http.routers.lifeos-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.lifeos-api.loadbalancer.server.port=8090"
 
   # ── SvelteKit Frontend ──────────────────────────────────────────────────────
   lifeos-frontend:
@@ -43,21 +44,11 @@ services:
     environment:
       ORIGIN: ${ORIGIN:-https://cockpit.infra.ori3com.cloud}
       PUBLIC_PB_URL: ${PUBLIC_PB_URL:-https://api-cockpit.infra.ori3com.cloud}
-    depends_on:
-      lifeos-pb:
-        condition: service_started
     networks:
       - coolify
       - lifeos_internal
     expose:
       - "3000"
-    labels:
-      - "caddy_0=https://cockpit.infra.ori3com.cloud"
-      - "caddy_0.encode=zstd gzip"
-      - "caddy_0.handle_path=/*"
-      - "caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}"
-      - "caddy_0.header=-Server"
-      - "caddy_ingress_network=coolify"
 
 volumes:
   lifeos_pb_data:
