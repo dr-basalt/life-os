@@ -1,11 +1,11 @@
 import type { RequestHandler } from './$types'
 import Anthropic from '@anthropic-ai/sdk'
-import { ANTHROPIC_API_KEY } from '$env/static/private'
+import { env } from '$env/dynamic/private'
 
 export const POST: RequestHandler = async ({ request }) => {
   const profile = await request.json()
 
-  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
   const prompt = `Tu es un architecte de vie expert. Voici le profil complet d'un utilisateur :
 
