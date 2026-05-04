@@ -27,7 +27,7 @@
 
 <!-- Filtres -->
 <div class="flex gap-2 mb-6">
-  {#each (['active', 'completed', 'all'] as const) as f}
+  {#each ['active', 'completed', 'all'] as f}
     <button
       class="btn text-sm {filter === f ? 'btn-primary' : 'btn-ghost'}"
       on:click={() => filter = f}
