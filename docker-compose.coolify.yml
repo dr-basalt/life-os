@@ -49,6 +49,16 @@ services:
       - lifeos_internal
     expose:
       - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lifeos-app-http.rule=Host(`cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.lifeos-app-http.entrypoints=http"
+      - "traefik.http.routers.lifeos-app-http.middlewares=redirect-to-https"
+      - "traefik.http.routers.lifeos-app.rule=Host(`cockpit.infra.ori3com.cloud`)"
+      - "traefik.http.routers.lifeos-app.entrypoints=https"
+      - "traefik.http.routers.lifeos-app.tls=true"
+      - "traefik.http.routers.lifeos-app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.lifeos-app.loadbalancer.server.port=3000"
 
 volumes:
   lifeos_pb_data:
