@@ -51,17 +51,25 @@ Génère 3 à 5 OKRs couvrant les domaines prioritaires. Sois précis, ambitieux
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     })
 
     const content = message.content[0]
     if (content.type !== 'text') throw new Error('Unexpected response type')
 
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in response')
+    // Extraire le JSON : retirer éventuels blocs markdown ```json ... ```
+    let raw = content.text.trim()
+    const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlock) {
+      raw = codeBlock[1].trim()
+    } else {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No JSON in response')
+      raw = jsonMatch[0]
+    }
 
-    const roadmap = JSON.parse(jsonMatch[0])
+    const roadmap = JSON.parse(raw)
     return new Response(JSON.stringify(roadmap), {
       headers: { 'Content-Type': 'application/json' }
     })
