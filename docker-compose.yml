@@ -37,7 +37,8 @@ services:
     environment:
       PUBLIC_PB_URL: https://api.${DOMAIN}
       ORIGIN: https://${DOMAIN}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SOMA_INTERNAL_URL: http://sternos-soma:3002
+      SOMA_ADMIN_TOKEN: ${SOMA_ADMIN_TOKEN:-SternOSAdmin2026}
     depends_on:
       pocketbase:
         condition: service_healthy

@@ -1,11 +1,10 @@
 import type { RequestHandler } from './$types'
-import Anthropic from '@anthropic-ai/sdk'
-import { env } from '$env/dynamic/private'
+
+const SOMA_URL = process.env.SOMA_INTERNAL_URL || 'http://sternos-soma:3002'
+const SOMA_TOKEN = process.env.SOMA_ADMIN_TOKEN || 'SternOSAdmin2026'
 
 export const POST: RequestHandler = async ({ request }) => {
   const profile = await request.json()
-
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
   const prompt = `Tu es un architecte de vie expert. Voici le profil complet d'un utilisateur :
 
@@ -46,26 +45,34 @@ Génère une roadmap OKR sur 12 mois. Réponds UNIQUEMENT en JSON valide avec ce
   "premier_pas": "string (L'ACTION CONCRÈTE à faire CETTE SEMAINE — ultra précise, pas de vague)"
 }
 
-Génère 3 à 5 OKRs couvrant les domaines prioritaires. Sois précis, ambitieux, aligné avec le rêve. Les KRs doivent être binaires ou numériques et mesurables.`
+Génère 3 à 5 OKRs couvrant les domaines prioritaires. Sois précis, ambitieux, aligné avec le rêve. Les KRs doivent être binaires ou numériques et mesurables. Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }]
+    const res = await fetch(`${SOMA_URL}/chat/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': SOMA_TOKEN,
+      },
+      body: JSON.stringify({
+        message: prompt,
+        session_id: `onboarding-${Date.now()}`,
+      }),
     })
 
-    const content = message.content[0]
-    if (content.type !== 'text') throw new Error('Unexpected response type')
+    if (!res.ok) throw new Error(`SOMA error: ${res.status}`)
+
+    const data = await res.json()
+    const text = data.content || data.response || ''
 
     // Extraire le JSON : retirer éventuels blocs markdown ```json ... ```
-    let raw = content.text.trim()
+    let raw = text.trim()
     const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (codeBlock) {
       raw = codeBlock[1].trim()
     } else {
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON in response')
+      if (!jsonMatch) throw new Error('No JSON in SOMA response')
       raw = jsonMatch[0]
     }
 
