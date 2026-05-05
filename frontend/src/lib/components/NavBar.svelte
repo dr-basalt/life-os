@@ -11,6 +11,7 @@
     { href: '/mindset',     label: 'Mindset',   icon: '◉' },
     { href: '/agents',      label: 'Agents',    icon: '⬟' },
     { href: '/onboarding',  label: 'Onboarding',icon: '✦' },
+    { href: '/projets',     label: 'Projets',   icon: '◫' },
     { href: '/admin',       label: 'SOMA',      icon: '⬡' },
   ]
 </script>
