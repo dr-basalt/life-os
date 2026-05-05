@@ -411,11 +411,27 @@
         {/if}
 
         {#if roadmap}
+          <!-- Badge Neo4j enrichi -->
+          {#if roadmap._neo4j_enriched}
+            <div class="flex items-center gap-2 text-xs text-zinc-500 mb-3 font-mono">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              Roadmap enrichie depuis ton persona graph (Neo4j)
+            </div>
+          {/if}
+
           <!-- Insight clé -->
-          <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4 mb-5">
+          <div class="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4 mb-3">
             <div class="text-indigo-400 text-xs font-mono uppercase tracking-wider mb-1">Insight clé</div>
             <p class="text-white text-sm font-medium">{roadmap.insight_cle}</p>
           </div>
+
+          <!-- Alignement Neo4j -->
+          {#if roadmap.alignement_neo4j}
+            <div class="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 mb-3">
+              <div class="text-zinc-400 text-xs font-mono uppercase tracking-wider mb-1">Alignement persona ↔ P0</div>
+              <p class="text-zinc-300 text-sm">{roadmap.alignement_neo4j}</p>
+            </div>
+          {/if}
 
           <!-- Premier pas -->
           <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-5">

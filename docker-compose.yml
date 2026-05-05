@@ -39,6 +39,7 @@ services:
       ORIGIN: https://${DOMAIN}
       SOMA_INTERNAL_URL: http://sternos-soma:3002
       SOMA_ADMIN_TOKEN: ${SOMA_ADMIN_TOKEN:-SternOSAdmin2026}
+      MCP_INTERNAL_URL: http://sternos-mcp:3001
     depends_on:
       pocketbase:
         condition: service_healthy
