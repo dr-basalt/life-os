@@ -4,7 +4,9 @@
 
   let projects: any[] = []
   let loading = true
-  let filter: 'all' | 'active' | 'paused' | 'done' | 'archived' = 'all'
+  let filter = 'all'
+
+  function setFilter(f: string) { filter = f }
   let editingId: string | null = null
   let editName = ''
   let editDesc = ''
@@ -45,7 +47,7 @@
     loading = false
   })
 
-  $: filtered = filter === 'all' ? projects : projects.filter(p => p.status === filter)
+  $: filtered = filter === 'all' ? projects : projects.filter((p: any) => p.status === filter)
 
   function startEdit(p: any) {
     editingId = p.id
@@ -92,7 +94,7 @@
   <!-- Filtres -->
   <div class="flex gap-2">
     {#each ['all', 'active', 'paused', 'done', 'archived'] as f}
-      <button on:click={() => { filter = f as typeof filter }}
+      <button on:click={() => setFilter(f)}
         class="text-xs px-3 py-1.5 rounded-full border transition-colors
           {filter === f
             ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
