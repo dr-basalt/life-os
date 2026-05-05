@@ -11,8 +11,8 @@ function getApiUrl(): string {
   if (host === 'localhost' || host === '127.0.0.1') {
     return 'http://localhost:8090'
   }
-  // Remplace le premier sous-domaine par "api"
-  return `${window.location.protocol}//${host.replace(/^[^.]+/, 'api')}`
+  // Préfixe le hostname avec "api." (api.stern-os.ori3com.cloud)
+  return `${window.location.protocol}//api.${host}`
 }
 
 // Singleton PocketBase client
