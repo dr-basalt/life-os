@@ -92,7 +92,7 @@
   <!-- Filtres -->
   <div class="flex gap-2">
     {#each ['all', 'active', 'paused', 'done', 'archived'] as f}
-      <button on:click={() => filter = f as any}
+      <button on:click={() => { filter = f as typeof filter }}
         class="text-xs px-3 py-1.5 rounded-full border transition-colors
           {filter === f
             ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300'
