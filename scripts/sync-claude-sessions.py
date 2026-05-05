@@ -102,7 +102,7 @@ def main():
     print("Auth OK ✓")
 
     # Lister les projets existants dans PocketBase
-    existing = pb_request('collections/projects/records?perPage=200', token=token)
+    existing = pb_request('collections/claude_projects/records?perPage=200', token=token)
     existing_by_id = {r['claude_id']: r for r in existing.get('items', [])}
 
     synced = 0
@@ -133,13 +133,13 @@ def main():
         existing_record = existing_by_id.get(claude_id)
         if existing_record:
             # Update
-            r = pb_request(f"collections/projects/records/{existing_record['id']}",
+            r = pb_request(f"collections/claude_projects/records/{existing_record['id']}",
                            'PATCH', payload, token)
             status = 'updated'
         else:
             # Create avec status par défaut
             payload['status'] = 'active'
-            r = pb_request('collections/projects/records', 'POST', payload, token)
+            r = pb_request('collections/claude_projects/records', 'POST', payload, token)
             status = 'created'
 
         if r.get('id'):

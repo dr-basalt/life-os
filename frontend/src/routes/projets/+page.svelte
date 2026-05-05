@@ -39,7 +39,7 @@
 
   onMount(async () => {
     try {
-      const res = await pb.collection('projects').getFullList({
+      const res = await pb.collection('claude_projects').getFullList({
         sort: '-last_active',
       })
       projects = res
@@ -60,7 +60,7 @@
   async function saveEdit(p: any) {
     saving = true
     try {
-      const updated = await pb.collection('projects').update(p.id, {
+      const updated = await pb.collection('claude_projects').update(p.id, {
         name: editName,
         description: editDesc,
         status: editStatus,
