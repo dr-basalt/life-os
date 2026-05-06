@@ -1,4 +1,19 @@
-.PHONY: up down restart logs ps build dev-up setup o3c-up o3c-down o3c-build o3c-logs gen-basicauth
+# ═══════════════════════════════════════════════════════════════════════════════
+# SternOS Makefile — Pipeline: IA → IaC → git → pull → deploy sur stern-os-brain
+#
+# Convention: AUCUNE commande docker ne tourne localement.
+# Toutes les ops infra passent par SSH vers stern-os-brain (46.224.111.203).
+# Usage: make <target> [SSH_KEY=/path/to/key]
+# ═══════════════════════════════════════════════════════════════════════════════
+
+BRAIN      = root@46.224.111.203
+SSH_KEY   ?= /tmp/sternos_key
+SSH        = ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no $(BRAIN)
+REMOTE_DIR = /opt/stern-os
+
+.PHONY: up down restart logs ps build dev-up setup o3c-up o3c-down o3c-build o3c-logs gen-basicauth \
+        deploy deploy-all pull-remote rebuild-mcp rebuild-frontend rebuild-pb rebuild-soma \
+        seed-gates fix-pb-schema init-qdrant status health mcp-tools
 
 # ─── Production ───────────────────────────────────────────────────────────────
 up:
@@ -76,3 +91,69 @@ update:
 	make build
 	make up
 	@echo "✓ Mise à jour terminée"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Pipeline IA → IaC → git → stern-os-brain
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Pull dernière version + restart services modifiés (pipeline standard)
+deploy:
+	@echo "→ git pull on stern-os-brain..."
+	$(SSH) "cd $(REMOTE_DIR) && git pull"
+
+# Pull + rebuild un service spécifique: make rebuild-mcp
+rebuild-mcp:
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build mcp --no-cache && docker compose up -d mcp"
+
+rebuild-frontend:
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build frontend --no-cache && docker compose up -d frontend"
+
+rebuild-pb:
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build pocketbase --no-cache && docker compose up -d pocketbase"
+
+rebuild-soma:
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build soma --no-cache && docker compose up -d soma"
+
+# Rebuild tout (après changement docker-compose ou multi-services)
+deploy-all:
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build --no-cache && docker compose up -d"
+
+# ─── Data Gates ───────────────────────────────────────────────────────────────
+
+# Seed/upsert toutes les Data Gates (idempotent)
+# Exécute scripts/seed-gates.js dans le container mcp (accès réseau interne)
+seed-gates:
+	@echo "→ Seeding Data Gates on stern-os-brain..."
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker exec sternos-mcp node /opt/stern-os/scripts/seed-gates.js"
+
+# Corriger les champs select PocketBase (maxSelect=0)
+# Exécute scripts/fix-pb-schema.js dans le container mcp
+fix-pb-schema:
+	@echo "→ Fixing PB schema on stern-os-brain..."
+	$(SSH) "docker exec sternos-mcp node /opt/stern-os/scripts/fix-pb-schema.js"
+
+# Initialiser les collections Qdrant
+# Exécute scripts/init-qdrant.sh depuis le container mcp via Node fetch
+init-qdrant:
+	@echo "→ Init Qdrant collections on stern-os-brain..."
+	$(SSH) "docker exec sternos-mcp node -e \
+		\"const Q='http://sternos-qdrant:6333';const V=1536;(async()=>{for(const c of ['insights','okrs','blueprint']){const r=await (await fetch(Q+'/collections/'+c,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({vectors:{size:V,distance:'Cosine'}})})).json();console.log(c,r.status||JSON.stringify(r));}})()\""
+
+# ─── Observabilité ────────────────────────────────────────────────────────────
+
+# Status des containers sur stern-os-brain
+status:
+	$(SSH) "docker compose -f $(REMOTE_DIR)/docker-compose.yml ps --format 'table {{.Name}}\t{{.Status}}'"
+
+# Health check de tous les services
+health:
+	@echo "=== MCP ==="
+	@curl -s https://mcp.stern-os.ori3com.cloud/ | python3 -c "import json,sys; d=json.load(sys.stdin); print('v'+d['version'], len(d['tools']), 'tools')" 2>/dev/null || echo "unreachable"
+	@echo "=== PocketBase ==="
+	@curl -s https://api.stern-os.ori3com.cloud/api/health | python3 -c "import json,sys; print(json.load(sys.stdin))" 2>/dev/null || echo "unreachable"
+	@echo "=== Frontend ==="
+	@curl -so /dev/null -w "%{http_code}" https://stern-os.ori3com.cloud/
+
+# Liste les tools MCP disponibles
+mcp-tools:
+	@curl -s https://mcp.stern-os.ori3com.cloud/ | python3 -c "import json,sys; d=json.load(sys.stdin); [print(' -', t['name']) for t in d['tools']]"
