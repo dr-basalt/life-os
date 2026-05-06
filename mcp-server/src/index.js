@@ -50,8 +50,8 @@ async function embedText(text) {
 // ── MCP Manifest ────────────────────────────────────────────────────────────
 app.get('/', (c) => c.json({
   name: 'SternOS MCP',
-  version: '1.1.0',
-  description: 'SternOS — Cognitive OS for dr-basalt. Persona graph, OKRs, tasks, roadmap, vector search, data gates.',
+  version: '1.2.0',
+  description: 'SternOS — Cognitive OS for dr-basalt. Persona graph, OKRs, tasks, roadmap, vector search, data gates SCRUD.',
   server: 'stern-os-brain 46.224.111.203',
   tools: [
     {
@@ -133,9 +133,89 @@ app.get('/', (c) => c.json({
       inputSchema: {
         type: 'object',
         properties: {
-          gate_name: { type: 'string', description: 'Nom de la gate à synchroniser' }
+          gate_name: { type: 'string' }
         },
         required: ['gate_name']
+      }
+    },
+    {
+      name: 'create_data_gate',
+      description: 'Créer une nouvelle Data Gate dans le registre',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name:            { type: 'string' },
+          type:            { type: 'string', description: 'obsidian|git|api|graphql|rss|database|sql|mcp|s3|syncthing|webhook|k8s|ollama|smtp|redis' },
+          role:            { type: 'string', description: 'knowledge_source|ai_provider|storage|compute|workflow|calendar|cache|monitor|code|data' },
+          protocol:        { type: 'string' },
+          source_path:     { type: 'string', description: 'URL, path, connection string' },
+          parser:          { type: 'string', description: 'markdown|json|jsonl|yaml|csv|html|sql|graphql|pdf|rss|cypher|binary' },
+          driver:          { type: 'string', description: 'postgres|sqlite|neo4j|qdrant|redis|bolt|mongo' },
+          targets:         { type: 'array', items: { type: 'string' }, description: '["qdrant:insights","neo4j:notes","pb:docs"]' },
+          auth_mode:       { type: 'string', description: 'none|bearer|basic|oauth2|apikey|ssh|mtls' },
+          auth_secret_ref: { type: 'string', description: 'Env var name holding the secret (never the secret itself)' },
+          sync_schedule:   { type: 'string', description: 'Cron expression, e.g. 0 3 * * *' },
+          description:     { type: 'string' },
+          enabled:         { type: 'boolean' }
+        },
+        required: ['name', 'type', 'source_path']
+      }
+    },
+    {
+      name: 'get_data_gate',
+      description: 'Récupérer une Data Gate par nom ou ID',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          id:   { type: 'string' }
+        }
+      }
+    },
+    {
+      name: 'update_data_gate',
+      description: 'Mettre à jour une Data Gate existante',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name:            { type: 'string', description: 'Name or id to identify the gate' },
+          id:              { type: 'string' },
+          type:            { type: 'string' },
+          role:            { type: 'string' },
+          source_path:     { type: 'string' },
+          parser:          { type: 'string' },
+          driver:          { type: 'string' },
+          targets:         { type: 'array', items: { type: 'string' } },
+          auth_mode:       { type: 'string' },
+          auth_secret_ref: { type: 'string' },
+          sync_schedule:   { type: 'string' },
+          description:     { type: 'string' },
+          enabled:         { type: 'boolean' }
+        }
+      }
+    },
+    {
+      name: 'delete_data_gate',
+      description: 'Supprimer une Data Gate du registre',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          id:   { type: 'string' }
+        }
+      }
+    },
+    {
+      name: 'search_data_gates',
+      description: 'Rechercher des Data Gates par type, rôle, statut ou texte libre',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          type:    { type: 'string' },
+          role:    { type: 'string' },
+          enabled: { type: 'boolean' },
+          query:   { type: 'string', description: 'Free text search on name/description/source_path' }
+        }
       }
     }
   ]
@@ -341,6 +421,82 @@ app.post('/tools/trigger_sync', async (c) => {
   } catch (e) {
     return c.json({ error: e.message }, 500)
   }
+})
+
+// ── Data Gates SCRUD ──────────────────────────────────────────────────────
+
+async function findGate(name, id) {
+  if (id) return pb.collection('data_gates').getOne(id)
+  const list = await pb.collection('data_gates').getFullList({
+    filter: `name = "${name.replace(/"/g, '\\"')}"`
+  })
+  return list[0] || null
+}
+
+app.post('/tools/create_data_gate', async (c) => {
+  const body = await c.req.json()
+  try {
+    await authPb()
+    const gate = await pb.collection('data_gates').create({
+      ...body,
+      sync_status: body.sync_status || 'idle',
+      enabled: body.enabled !== false,
+    })
+    return c.json(gate)
+  } catch (e) { return c.json({ error: e.message }, 500) }
+})
+
+app.post('/tools/get_data_gate', async (c) => {
+  const { name, id } = await c.req.json()
+  try {
+    await authPb()
+    const gate = await findGate(name, id)
+    return gate ? c.json(gate) : c.json({ error: 'Not found' }, 404)
+  } catch (e) { return c.json({ error: e.message }, 500) }
+})
+
+app.post('/tools/update_data_gate', async (c) => {
+  const { name, id, ...data } = await c.req.json()
+  try {
+    await authPb()
+    const gate = await findGate(name, id)
+    if (!gate) return c.json({ error: 'Not found' }, 404)
+    const updated = await pb.collection('data_gates').update(gate.id, data)
+    return c.json(updated)
+  } catch (e) { return c.json({ error: e.message }, 500) }
+})
+
+app.post('/tools/delete_data_gate', async (c) => {
+  const { name, id } = await c.req.json()
+  try {
+    await authPb()
+    const gate = await findGate(name, id)
+    if (!gate) return c.json({ error: 'Not found' }, 404)
+    await pb.collection('data_gates').delete(gate.id)
+    return c.json({ success: true, deleted: gate.name })
+  } catch (e) { return c.json({ error: e.message }, 500) }
+})
+
+app.post('/tools/search_data_gates', async (c) => {
+  const { type, role, enabled, query } = await c.req.json()
+  try {
+    await authPb()
+    const filters = []
+    if (type) filters.push(`type = "${type}"`)
+    if (role) filters.push(`role = "${role}"`)
+    if (enabled !== undefined) filters.push(`enabled = ${enabled}`)
+    const gates = await pb.collection('data_gates').getFullList({
+      filter: filters.join(' && ') || undefined,
+      sort: 'name'
+    })
+    const results = query
+      ? gates.filter(g =>
+          g.name?.includes(query) ||
+          g.description?.includes(query) ||
+          g.source_path?.includes(query))
+      : gates
+    return c.json({ results, total: results.length })
+  } catch (e) { return c.json({ error: e.message }, 500) }
 })
 
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
