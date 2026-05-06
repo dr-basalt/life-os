@@ -12,6 +12,8 @@ const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || 'SternOS2026xNeo4j'
 const PB_URL = process.env.PB_URL || 'http://sternos-pb:8090'
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@ori3com.cloud'
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'SternOS2026!'
+const QDRANT_URL = process.env.QDRANT_URL || 'http://sternos-qdrant:6333'
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || ''
 
 let neoDriver
 try {
@@ -156,6 +158,55 @@ export function docker_status() {
   }
 }
 
+// ── Qdrant helpers ─────────────────────────────────────────────────────────
+
+async function embedText(text) {
+  const res = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({ model: 'text-embedding-3-small', input: text })
+  })
+  const data = await res.json()
+  if (!data.data?.[0]?.embedding) throw new Error('Embedding failed: ' + JSON.stringify(data))
+  return data.data[0].embedding
+}
+
+export async function qdrant_search({ collection = 'insights', query_text, top_k = 5 }) {
+  try {
+    const vector = await embedText(query_text)
+    const res = await fetch(`${QDRANT_URL}/collections/${collection}/points/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vector, limit: top_k, with_payload: true })
+    })
+    const data = await res.json()
+    return { results: data.result || [] }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+export async function embed_and_upsert({ collection = 'insights', id, text, metadata = {} }) {
+  try {
+    const vector = await embedText(text)
+    const pointId = id || crypto.randomUUID()
+    const res = await fetch(`${QDRANT_URL}/collections/${collection}/points`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        points: [{ id: pointId, vector, payload: { text, ...metadata, indexed_at: new Date().toISOString() } }]
+      })
+    })
+    const data = await res.json()
+    return { success: true, id: pointId, status: data.status }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
 export function search_code({ query, file_pattern = '**/*.{js,ts,svelte,yaml,json}' }) {
   try {
     const output = execSync(
@@ -293,10 +344,44 @@ export const TOOL_DEFINITIONS = [
         required: ['query']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'qdrant_search',
+      description: 'Recherche sémantique dans les collections Qdrant (insights, okrs, blueprint)',
+      parameters: {
+        type: 'object',
+        properties: {
+          collection: { type: 'string', description: 'Nom de la collection Qdrant (défaut: insights)' },
+          query_text: { type: 'string', description: 'Texte à rechercher sémantiquement' },
+          top_k: { type: 'number', description: 'Nombre de résultats (défaut: 5)' }
+        },
+        required: ['query_text']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'embed_and_upsert',
+      description: 'Indexer un document dans Qdrant (embedding OpenAI text-embedding-3-small)',
+      parameters: {
+        type: 'object',
+        properties: {
+          collection: { type: 'string', description: 'Collection cible (défaut: insights)' },
+          id: { type: 'string', description: 'ID unique du point (UUID généré si absent)' },
+          text: { type: 'string', description: 'Texte à embedder et indexer' },
+          metadata: { type: 'object', description: 'Métadonnées additionnelles (source, tags, etc.)' }
+        },
+        required: ['text']
+      }
+    }
   }
 ]
 
 export const TOOL_MAP = {
   read_file, write_file, list_dir, run_command, git_commit,
-  neo4j_query, pb_api, docker_status, search_code
+  neo4j_query, pb_api, docker_status, search_code,
+  qdrant_search, embed_and_upsert
 }

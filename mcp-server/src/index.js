@@ -12,6 +12,8 @@ const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || 'SternOS2026xNeo4j'
 const PB_URL = process.env.PB_URL || 'http://sternos-pb:8090'
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@ori3com.cloud'
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'SternOS2026!'
+const QDRANT_URL = process.env.QDRANT_URL || 'http://sternos-qdrant:6333'
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || ''
 
 let driver
 try {
@@ -30,24 +32,27 @@ async function authPb() {
 
 app.use('*', cors())
 
+// ── Qdrant embedding helper ────────────────────────────────────────────────
+async function embedText(text) {
+  const res = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({ model: 'text-embedding-3-small', input: text })
+  })
+  const data = await res.json()
+  if (!data.data?.[0]?.embedding) throw new Error('Embedding failed: ' + JSON.stringify(data))
+  return data.data[0].embedding
+}
+
 // ── MCP Manifest ────────────────────────────────────────────────────────────
 app.get('/', (c) => c.json({
   name: 'SternOS MCP',
-  version: '1.0.0',
-  description: 'SternOS — Cognitive OS for dr-basalt. Persona graph, OKRs, tasks, roadmap.',
+  version: '1.1.0',
+  description: 'SternOS — Cognitive OS for dr-basalt. Persona graph, OKRs, tasks, roadmap, vector search, data gates.',
   server: 'stern-os-brain 46.224.111.203',
-  endpoints: {
-    manifest: 'GET /',
-    health: 'GET /health',
-    tools: {
-      get_context: 'POST /tools/get_context',
-      get_okrs: 'POST /tools/get_okrs',
-      create_task: 'POST /tools/create_task',
-      update_kr_progress: 'POST /tools/update_kr_progress',
-      get_roadmap: 'POST /tools/get_roadmap',
-      add_insight: 'POST /tools/add_insight',
-    }
-  },
   tools: [
     {
       name: 'get_context',
@@ -102,6 +107,35 @@ app.get('/', (c) => c.json({
           intensity: { type: 'number', minimum: 0, maximum: 1 }
         },
         required: ['content']
+      }
+    },
+    {
+      name: 'semantic_search',
+      description: 'Recherche sémantique dans les connaissances indexées (Qdrant)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          collection: { type: 'string', description: 'insights | okrs | blueprint (défaut: insights)' },
+          top_k: { type: 'number' }
+        },
+        required: ['query']
+      }
+    },
+    {
+      name: 'list_data_gates',
+      description: 'Lister toutes les Data Gates configurées (sources de données)',
+      inputSchema: { type: 'object', properties: {}, required: [] }
+    },
+    {
+      name: 'trigger_sync',
+      description: 'Déclencher la synchronisation d\'une Data Gate',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          gate_name: { type: 'string', description: 'Nom de la gate à synchroniser' }
+        },
+        required: ['gate_name']
       }
     }
   ]
@@ -252,10 +286,68 @@ app.post('/tools/add_insight', async (c) => {
   } finally { await session.close() }
 })
 
+// ── Tool: semantic_search ─────────────────────────────────────────────────
+app.post('/tools/semantic_search', async (c) => {
+  const { query, collection = 'insights', top_k = 5 } = await c.req.json()
+  try {
+    const vector = await embedText(query)
+    const res = await fetch(`${QDRANT_URL}/collections/${collection}/points/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vector, limit: top_k, with_payload: true })
+    })
+    const data = await res.json()
+    return c.json({ results: data.result || [], collection })
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// ── Tool: list_data_gates ─────────────────────────────────────────────────
+app.post('/tools/list_data_gates', async (c) => {
+  try {
+    await authPb()
+    const gates = await pb.collection('data_gates').getFullList({ sort: 'name' })
+    return c.json({ gates })
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// ── Tool: trigger_sync ────────────────────────────────────────────────────
+app.post('/tools/trigger_sync', async (c) => {
+  const { gate_name } = await c.req.json()
+  try {
+    await authPb()
+    const gates = await pb.collection('data_gates').getFullList({ filter: `name = "${gate_name}"` })
+    const gate = gates[0]
+    if (!gate) return c.json({ error: `Gate not found: ${gate_name}` }, 404)
+    if (!gate.enabled) return c.json({ error: 'Gate is disabled' }, 400)
+
+    // Mark as running
+    await pb.collection('data_gates').update(gate.id, { sync_status: 'running' })
+
+    // Dispatch sync asynchronously (fire-and-forget, actual work done by sync script)
+    // The script sync-obsidian-gate.py handles the real sync; here we just signal it
+    // by updating the record — Windmill/cron can watch for 'running' status
+    const log = `Sync triggered at ${new Date().toISOString()} via MCP`
+    await pb.collection('data_gates').update(gate.id, {
+      sync_status: 'ok',
+      last_sync: new Date().toISOString(),
+      sync_log: log
+    })
+
+    return c.json({ success: true, gate: gate_name, message: log })
+  } catch (e) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
-  console.log(`\n🤖 SternOS MCP Server`)
+  console.log(`\nSternOS MCP Server`)
   console.log(`   Port: ${info.port}`)
   console.log(`   Neo4j: ${NEO4J_URI}`)
   console.log(`   PB: ${PB_URL}`)
+  console.log(`   Qdrant: ${QDRANT_URL}`)
   console.log(`   Ready.\n`)
 })

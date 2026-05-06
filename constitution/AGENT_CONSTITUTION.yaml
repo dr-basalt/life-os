@@ -25,6 +25,7 @@ context:
     frontend: "SvelteKit + Tailwind CSS"
     backend: "PocketBase v0.22"
     graph: "Neo4j 5.20"
+    vector_db: "Qdrant v1.9 (collections: insights, okrs, blueprint)"
     orchestration: "Windmill"
     reverse_proxy: "Traefik v3"
     runtime: "Docker Compose"
@@ -124,6 +125,16 @@ tools:
   - name: search_code
     description: "Rechercher dans le codebase"
     params: [query, file_pattern]
+
+  - name: qdrant_search
+    description: "Recherche sémantique dans Qdrant (insights, okrs, blueprint)"
+    params: [query_text, collection, top_k]
+    usage: "Utilise qdrant_search AVANT de répondre à des questions sur les notes, insights ou décisions architecturales pour enrichir ta réponse."
+
+  - name: embed_and_upsert
+    description: "Indexer un document dans Qdrant avec embedding OpenAI"
+    params: [text, collection, id, metadata]
+    usage: "Utilise embed_and_upsert pour indexer de nouveaux insights importants ou décisions architecturales."
 
 communication_style:
   language: "fr"

@@ -12,6 +12,7 @@
     { href: '/agents',      label: 'Agents',    icon: '⬟' },
     { href: '/onboarding',  label: 'Onboarding',icon: '✦' },
     { href: '/projets',     label: 'Projets',   icon: '◫' },
+    { href: '/gates',       label: 'Data Gates',icon: '⊛' },
     { href: '/admin',       label: 'SOMA',      icon: '⬡' },
   ]
 </script>

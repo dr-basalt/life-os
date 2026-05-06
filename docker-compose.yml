@@ -120,6 +120,8 @@ services:
       PB_URL: http://sternos-pb:8090
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+      QDRANT_URL: http://sternos-qdrant:6333
+      OPENAI_API_KEY: ${LLM_API_KEY:-}
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -147,6 +149,8 @@ services:
       PB_URL: http://sternos-pb:8090
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
+      QDRANT_URL: http://sternos-qdrant:6333
+      OPENAI_API_KEY: ${LLM_API_KEY:-}
     volumes:
       - /opt/stern-os:/opt/stern-os   # accès au codebase en live
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -160,7 +164,20 @@ services:
       - "traefik.http.routers.soma.tls.certresolver=letsencrypt"
       - "traefik.http.services.soma.loadbalancer.server.port=3002"
 
+  # ─── Qdrant — Vector DB (RAG + semantic search) ──────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.9.2
+    container_name: sternos-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      default:
+        aliases:
+          - sternos-qdrant
+
 volumes:
   pb_data:
   wm_pg_data:
   acme_data:
+  qdrant_data:
