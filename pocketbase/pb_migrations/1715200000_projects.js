@@ -1,6 +1,9 @@
 migrate((db) => {
   const dao = new Dao(db)
 
+  // Skip if already exists (created manually before this migration)
+  try { if (dao.findCollectionByNameOrId('projects')) return } catch {}
+
   // Collection projects — sessions Claude Code
   const collection = new Collection({
     id: 'sternosprojects1',

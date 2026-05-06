@@ -1,6 +1,9 @@
 migrate((db) => {
   const dao = new Dao(db)
 
+  // Skip if already exists
+  try { if (dao.findCollectionByNameOrId('data_gates')) return } catch {}
+
   const collection = new Collection({
     id: 'sternosdatagates1',
     name: 'data_gates',
