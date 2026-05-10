@@ -62,72 +62,93 @@ current:
     runtime: "Docker Compose"
     gitops: "GitHub → git pull → make deploy"
 
-# ── Architecture cible (v1.0) ─────────────────────────────────────────────────
+# ── Architecture cible (v1.0) — DÉCISION VALIDÉE ─────────────────────────────
+# "Directus structure le monde. Neo4j comprend le monde.
+#  Qdrant se souvient du monde. Le runtime agentique transforme le monde.
+#  Next.js + Payload te le rendent utilisable."
 target:
-  frontend:
-    tech: "Next.js ou Astro + React + TailwindCSS + shadcn/ui"
-    pattern: "UI Schema Registry → invariant components renderer"
-    note: "Migration progressive depuis SvelteKit. Même invariants."
 
-  meta_backend:
-    tech: "Fastify TypeScript + Zod + OpenAPI"
-    role: "API Gateway — auth, RBAC, tenant context, config runtime"
-    note: "Remplace progressivement PocketBase pour la logique métier"
+  # ── Experience Plane ──────────────────────────────────────────────────────
+  cockpit:
+    tech: "Next.js 15 App Router + Payload v3 + Tailwind + shadcn/ui"
+    url: "https://app.stern-os.ori3com.cloud"
+    role: "Cockpit applicatif SternOS — OKRs, life domains, clone cognitif, execution dashboard"
+    pattern: "Server Components + Server Actions + Payload local API"
+    features: [auth, RBAC, admin_panel, live_preview, multi_tenancy, forms, mutations]
+    container: sternos-next
+    note: "Remplace SvelteKit. Payload v3 tourne INSIDE Next.js (même container)."
 
-  state_db:
-    primary: "PocketBase (v0.x) → PostgreSQL (v1.0)"
-    note: "Migration Prisma/Drizzle quand multi-tenant requis"
+  # ── Control Plane ─────────────────────────────────────────────────────────
+  data_studio:
+    tech: "Directus (latest)"
+    url: "https://directus.stern-os.ori3com.cloud"
+    role: "Meta data/control plane — schema studio, REST/GraphQL auto, permissions, workflows"
+    database: Postgres 16
+    collections: [objectives, key_results, tasks, victories, data_gates, ui_schemas, agents]
+    features: [schema_studio, rest_graphql_auto, flows_automation, permissions_fine_grained, webhooks]
+    container: sternos-directus
+    note: "Remplace PocketBase. Database-first. API instantanée. Agents écrivent via Directus API."
 
+  shared_db:
+    tech: "PostgreSQL 16"
+    role: "Source de vérité relationnelle partagée — Directus + Payload sur schemas séparés"
+    container: sternos-postgres
+    note: "Remplace SQLite de PocketBase. Directus = schema 'directus', Payload = schema 'payload'."
+
+  # ── Knowledge Plane ───────────────────────────────────────────────────────
+  cognitive_graph:
+    tech: "Neo4j 5.x"
+    role: "Graphe cognitif — User, Douleurs, Patterns, Désirs, P0, OKRs, Insights, Concepts"
+    note: "Inchangé. Seule source pour les invariants et les relations causales."
+
+  semantic_memory:
+    tech: "Qdrant v1.9.2"
+    role: "Mémoire sémantique — notes Obsidian, OKRs embeddings, RAG"
+    collections: [insights, okrs, blueprint]
+    note: "Inchangé."
+
+  # ── Execution Plane ───────────────────────────────────────────────────────
   agent_runtime:
-    tech: "LangGraph (workflows) + LiteLLM (routing)"
-    role: "Multi-agent: Coach, Architect, UI Designer, Reviewer, Executor"
-    observability: "Langfuse traces + costs"
-    note: "SOMA reste en v0.x. LangGraph arrive en v0.5"
+    tech: "SOMA (Hono.js) — évolue vers LangGraph en v1.x"
+    role: "Discovery, reasoning, génération, orchestration"
+    note: "SOMA v0.x reste. LangGraph + LiteLLM en v1.x."
 
-  knowledge:
-    graph: "Neo4j — persona, concepts, relations, invariants"
-    vector: "Qdrant — embeddings, RAG, semantic search"
-    metadata: "Directus ou PocketBase Admin"
+  mcp_server:
+    tech: "Hono.js Node.js"
+    role: "19 tools MCP — v1.3.0 maintenant, v1.4.0 avec adapter Directus"
+    migration: "Appels PocketBase → remplacés par Directus SDK en v1.4.0"
 
-  ai_gateway:
-    tech: "LiteLLM"
-    role: "Router multi-provider: OpenAI, Anthropic, OpenRouter, Ollama, custom"
-
-  workflow_engine:
-    tech: "Temporal (v1.0) ou n8n (v0.x)"
-    role: "Orchestration durable, retry, compensation"
-
-  gitops:
-    source: "GitHub (current) → GitLab (target)"
-    ci_cd: "ArgoCD ou Coolify"
-    iac: "Terraform (infra) + Helm (k8s)"
-
-  observability:
-    llm_traces: "Langfuse"
-    infra: "OpenTelemetry + Prometheus"
-    logs: "Loki ou CloudWatch"
+  # ── Sites SEO/vitrine (hors SternOS core) ─────────────────────────────────
+  sites_seo:
+    tech: "Astro + Tailwind"
+    role: "Sites publics, landing pages, blogs, documentation, contenu marketing O3C"
+    note: "PAS le shell de SternOS. Uniquement sites vitrine de l'écosystème."
 
 # ── Couches système ───────────────────────────────────────────────────────────
 planes:
-  control_plane:
-    description: "Mission, objectifs, OKR, règles, invariants, runtime config"
-    components: [constitution, okr_engine, hitl_contract, agent_registry]
-
   data_plane:
-    description: "Notes, documents, fichiers, API, tâches, calendrier, journaux"
-    components: [data_gate_registry, ingestion_pipeline, parser_registry]
+    description: "Sources déclarées, connectors, parsers, classifiers"
+    components: [data_gate_registry, obsidian_sync, git_connectors, api_connectors]
+
+  meta_ir_plane:
+    description: "Discovery → entities / relations / events / intents / axioms / OKR"
+    components: [soma_discovery, entity_extraction, meta_ir_builder]
 
   knowledge_plane:
-    description: "Neo4j + Qdrant + PostgreSQL/PocketBase"
-    components: [neo4j_persona, qdrant_vectors, pocketbase_state]
+    description: "Neo4j (invariants) + Qdrant (sémantique) + Postgres (relationnel)"
+    components: [neo4j_persona, qdrant_vectors, postgres_state]
+
+  control_plane:
+    description: "Directus — schema studio, collections, permissions, REST/GraphQL, flows"
+    components: [directus_schema, directus_api, directus_flows, directus_permissions]
 
   execution_plane:
-    description: "Agents, workflows, MCP, n8n/Windmill, appels API"
-    components: [soma_runtime, mcp_server, windmill, langgraph]
+    description: "SOMA + MCP + Windmill — discovery, reasoning, orchestration"
+    components: [soma_runtime, mcp_server_v1, windmill_flows]
 
   experience_plane:
-    description: "UI générées par schéma, cockpit, dashboards, vues métier"
-    components: [ui_schema_registry, frontend_renderer, invariant_widgets]
+    description: "Next.js + Payload — cockpit OKR, dashboards, mutations, live preview"
+    components: [nextjs_app_router, payload_collections, shadcn_widgets, ui_schema_registry]
 
 # ── Roadmap versions ──────────────────────────────────────────────────────────
 roadmap:
@@ -137,24 +158,25 @@ roadmap:
 
   v0.2:
     status: done
-    delivered: [data_gate_registry, obsidian_sync, qdrant, mcp_scrud, seed_gates]
+    delivered: [data_gate_registry, obsidian_sync, qdrant, mcp_scrud, seed_gates, constitution_p0]
 
   v0.3:
-    status: next
-    target: [neo4j_graph_viewer, entity_extraction_from_vault, concept_relations_ui]
+    status: in_progress
+    delivered_partial: [mcp_tools_15_19, index_okrs_qdrant, sync_vault_neo4j, ui_schemas_pb]
+    target: [postgres_directus_services, nextjs_payload_app, directus_schema_setup]
 
   v0.4:
     status: planned
-    target: [rag_context_builder, semantic_search_ui, daily_briefing_from_qdrant]
+    target: [migrate_pb_to_directus, mcp_v1.4_directus_adapter, react_widgets_6, okr_cockpit_routes]
 
   v0.5:
     status: planned
-    target: [langgraph_workflows, agent_coach, langfuse_tracing, json_output_validation]
+    target: [entity_extraction_graph, rag_daily_briefing, semantic_search_ui, graph_view_cytoscape]
 
   v0.6:
     status: planned
-    target: [ui_schema_engine, frontend_renderer, ui_designer_agent, page_synthesis]
+    target: [ui_schema_engine, schema_driven_renderer, generate_ui_schema_agent]
 
   v1.0:
     status: vision
-    target: [multi_tenant, rbac, billing, marketplace_agents, full_gitops]
+    target: [langgraph_multi_agent, litellm_gateway, multi_tenant, rbac_full, marketplace_agents, full_gitops]

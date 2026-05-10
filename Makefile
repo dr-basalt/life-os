@@ -13,7 +13,8 @@ REMOTE_DIR = /opt/stern-os
 
 .PHONY: up down restart logs ps build dev-up setup o3c-up o3c-down o3c-build o3c-logs gen-basicauth \
         deploy deploy-all pull-remote rebuild-mcp rebuild-frontend rebuild-pb rebuild-soma \
-        seed-gates fix-pb-schema init-qdrant status health mcp-tools
+        seed-gates fix-pb-schema init-qdrant seed-ui-schemas index-okrs sync-vault sync-all \
+        status health mcp-tools
 
 # ─── Production ───────────────────────────────────────────────────────────────
 up:
@@ -138,6 +139,24 @@ init-qdrant:
 	@echo "→ Init Qdrant collections on stern-os-brain..."
 	$(SSH) "docker exec sternos-soma node -e \
 		\"const Q='http://sternos-qdrant:6333';const V=1536;(async()=>{for(const c of ['insights','okrs','blueprint']){const r=await (await fetch(Q+'/collections/'+c,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({vectors:{size:V,distance:'Cosine'}})})).json();console.log(c,r.status||JSON.stringify(r));}})()\""
+
+# Seed UI Schemas dans PocketBase (4 schémas: dashboard, detail, graph, briefing)
+seed-ui-schemas:
+	@echo "→ Seeding UI Schemas on stern-os-brain..."
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker exec sternos-soma node /opt/stern-os/scripts/seed-ui-schemas.js"
+
+# Indexer OKRs + KRs dans Qdrant (collection: okrs)
+index-okrs:
+	@echo "→ Indexing OKRs into Qdrant on stern-os-brain..."
+	$(SSH) "docker exec sternos-soma node /opt/stern-os/scripts/index-okrs.js"
+
+# Synchroniser le vault Obsidian → Qdrant insights + Neo4j entities
+sync-vault:
+	@echo "→ Syncing Obsidian vault to Qdrant + Neo4j on stern-os-brain..."
+	$(SSH) "docker exec sternos-soma python3 /opt/stern-os/scripts/sync-obsidian-gate.py"
+
+# Tout synchroniser (OKRs + vault)
+sync-all: index-okrs sync-vault
 
 # ─── Observabilité ────────────────────────────────────────────────────────────
 
