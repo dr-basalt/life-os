@@ -6,14 +6,15 @@ import { ActionList } from '@/components/widgets/ActionList'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ObjectiveDetailPage({ params }: { params: { id: string } }) {
+export default async function ObjectiveDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const payload = await getPayload({ config })
 
   const [obj, krsRes, tasksRes, victoriesRes] = await Promise.all([
-    payload.findByID({ collection: 'objectives', id: params.id, depth: 0 }).catch(() => null),
-    payload.find({ collection: 'key_results', where: { objective: { equals: params.id } } }),
+    payload.findByID({ collection: 'objectives', id, depth: 0 }).catch(() => null),
+    payload.find({ collection: 'key_results', where: { objective: { equals: id } } }),
     payload.find({ collection: 'tasks', where: { status: { in: ['todo', 'in_progress'] } }, limit: 20 }),
-    payload.find({ collection: 'victories', where: { objective: { equals: params.id } }, sort: '-date', limit: 5 }),
+    payload.find({ collection: 'victories', where: { objective: { equals: id } }, sort: '-date', limit: 5 }),
   ])
 
   if (!obj) notFound()
