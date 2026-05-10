@@ -37,10 +37,10 @@ export default async function DashboardPage() {
     .map(o => ({ id: o.id, label: o.title, pain: o.description ?? undefined }))
 
   const okrsForWidget = objectives.map(o => ({
-    id: o.id,
-    title: o.title,
-    emoji: o.emoji ?? undefined,
-    status: o.status,
+    id: String(o.id),
+    title: o.title as string,
+    emoji: (o.emoji ?? undefined) as string | undefined,
+    status: o.status as string,
     confidence: o.confidence ?? undefined,
     key_results: Array.isArray(o.key_results)
       ? o.key_results.map((kr: Record<string, unknown>) => ({

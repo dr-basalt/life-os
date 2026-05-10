@@ -20,19 +20,19 @@ export default async function ObjectiveDetailPage({ params }: { params: Promise<
   if (!obj) notFound()
 
   const okrForWidget = [{
-    id: obj.id,
-    title: obj.title,
-    emoji: obj.emoji ?? undefined,
-    status: obj.status,
+    id: String(obj.id),
+    title: obj.title as string,
+    emoji: (obj.emoji ?? undefined) as string | undefined,
+    status: obj.status as string,
     confidence: obj.confidence ?? undefined,
     key_results: krsRes.docs.map(kr => ({
-      id: kr.id,
-      title: kr.title,
+      id: String(kr.id),
+      title: kr.title as string,
       current_value: kr.current_value ?? undefined,
       target_value: kr.target_value ?? undefined,
       baseline_value: kr.baseline_value ?? undefined,
-      unit: kr.unit ?? undefined,
-      status: kr.status,
+      unit: (kr.unit ?? undefined) as string | undefined,
+      status: kr.status as string,
       confidence: kr.confidence ?? undefined,
     })),
   }]
