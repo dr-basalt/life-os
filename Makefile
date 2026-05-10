@@ -121,22 +121,22 @@ deploy-all:
 # ─── Data Gates ───────────────────────────────────────────────────────────────
 
 # Seed/upsert toutes les Data Gates (idempotent)
-# Exécute scripts/seed-gates.js dans le container mcp (accès réseau interne)
+# Exécute scripts/seed-gates.js dans sternos-soma (mount /opt/stern-os complet)
 seed-gates:
 	@echo "→ Seeding Data Gates on stern-os-brain..."
-	$(SSH) "cd $(REMOTE_DIR) && git pull && docker exec sternos-mcp node /opt/stern-os/scripts/seed-gates.js"
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker exec sternos-soma node /opt/stern-os/scripts/seed-gates.js"
 
 # Corriger les champs select PocketBase (maxSelect=0)
-# Exécute scripts/fix-pb-schema.js dans le container mcp
+# Exécute scripts/fix-pb-schema.js dans sternos-soma
 fix-pb-schema:
 	@echo "→ Fixing PB schema on stern-os-brain..."
-	$(SSH) "docker exec sternos-mcp node /opt/stern-os/scripts/fix-pb-schema.js"
+	$(SSH) "docker exec sternos-soma node /opt/stern-os/scripts/fix-pb-schema.js"
 
 # Initialiser les collections Qdrant
-# Exécute scripts/init-qdrant.sh depuis le container mcp via Node fetch
+# Exécute via sternos-soma (mount /opt/stern-os complet, accès réseau interne)
 init-qdrant:
 	@echo "→ Init Qdrant collections on stern-os-brain..."
-	$(SSH) "docker exec sternos-mcp node -e \
+	$(SSH) "docker exec sternos-soma node -e \
 		\"const Q='http://sternos-qdrant:6333';const V=1536;(async()=>{for(const c of ['insights','okrs','blueprint']){const r=await (await fetch(Q+'/collections/'+c,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({vectors:{size:V,distance:'Cosine'}})})).json();console.log(c,r.status||JSON.stringify(r));}})()\""
 
 # ─── Observabilité ────────────────────────────────────────────────────────────
