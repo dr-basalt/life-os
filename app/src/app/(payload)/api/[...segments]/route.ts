@@ -1,9 +1,10 @@
 import { REST_DELETE, REST_GET, REST_OPTIONS, REST_PATCH, REST_POST, REST_PUT } from '@payloadcms/next/routes'
 import { NextRequest } from 'next/server'
 
-const configPromise = import('@payload-config')
+// Résout le default export pour obtenir Promise<SanitizedConfig>
+const configPromise = import('@payload-config').then((m) => m.default)
 
-// Wrapper: résout params async (Next.js 15) avant de passer au handler Payload
+// Wrapper : résout params async (Next.js 15) avant de passer au handler Payload
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function awaitParams(handler: any) {
   return async (req: NextRequest, args: { params: Promise<{ segments: string[] }> }) => {
