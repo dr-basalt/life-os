@@ -122,6 +122,10 @@ services:
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
       QDRANT_URL: http://sternos-qdrant:6333
       OPENAI_API_KEY: ${LLM_API_KEY:-}
+      DIRECTUS_URL: http://sternos-directus:8055
+      DIRECTUS_ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL:-admin@ori3com.cloud}
+      DIRECTUS_ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD:-}
+      USE_DIRECTUS: ${USE_DIRECTUS:-false}
     depends_on:
       pocketbase:
         condition: service_healthy
