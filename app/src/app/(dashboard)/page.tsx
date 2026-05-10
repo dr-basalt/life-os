@@ -34,7 +34,7 @@ export default async function DashboardPage() {
 
   const p0Items = objectives
     .filter(o => o.confidence != null && o.confidence < 50)
-    .map(o => ({ id: o.id, label: o.title, pain: o.description ?? undefined }))
+    .map(o => ({ id: String(o.id), label: o.title as string, pain: (o.description ?? undefined) as string | undefined }))
 
   const okrsForWidget = objectives.map(o => ({
     id: String(o.id),
