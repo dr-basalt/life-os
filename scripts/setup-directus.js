@@ -38,16 +38,13 @@ async function getCollections(token) {
 }
 
 async function createCollection(token, name, fields, note = '') {
+  // Directus v11: ne pas déclarer 'id' — créé automatiquement (uuid pk)
+  // date_created / date_updated ajoutés via champs séparés après création
   const r = await api('POST', 'collections', {
     collection: name,
-    meta: { note, icon: 'box' },
-    schema: {},
-    fields: [
-      { field: 'id', type: 'uuid', meta: { hidden: true, readonly: true }, schema: { is_primary_key: true, has_auto_increment: false, default_value: 'auto_uuid' } },
-      { field: 'date_created', type: 'timestamp', meta: { special: ['date-created'], hidden: true }, schema: {} },
-      { field: 'date_updated', type: 'timestamp', meta: { special: ['date-updated'], hidden: true }, schema: {} },
-      ...fields
-    ]
+    meta: { note, icon: 'box', display_template: '{{title}}' },
+    schema: { name },
+    fields
   }, token)
   return r
 }
