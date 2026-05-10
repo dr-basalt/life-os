@@ -1,0 +1,145 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — OKR Engine
+# Le moteur d'objectifs. Toute action doit être reliée à un OKR ou un KR.
+# Pas d'OKR = pas d'exécution. Pas de KR = pas de tâche.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Philosophie OKR ───────────────────────────────────────────────────────────
+philosophy: >
+  Les OKRs sont la seule source de vérité pour la priorisation.
+  Tout agent, workflow, tool doit vérifier l'alignement OKR avant d'agir.
+  Un résultat sans OKR est du bruit. Un OKR sans KR mesurable est un vœu.
+
+# ── Modèle de données ─────────────────────────────────────────────────────────
+model:
+  okr:
+    fields:
+      - title:       "Objectif qualitatif (inspirant, orienté résultat)"
+      - description: "Contexte étendu"
+      - period:      "Trimestre ou sprint (Q1-2026, Sprint-42)"
+      - status:      "active | paused | completed | abandoned"
+      - owner:       "dr-basalt ou agent assigné"
+      - tags:        "Tags libres (stratégie, produit, infra, knowledge...)"
+      - created_at:  "ISO date"
+      - updated_at:  "ISO date"
+
+  key_result:
+    fields:
+      - okr_id:       "Référence OKR parent"
+      - title:        "KR mesurable (SMART)"
+      - metric:       "Unité de mesure (%, #, ratio, booléen)"
+      - start_value:  "Valeur initiale"
+      - target_value: "Valeur cible"
+      - current_value: "Valeur courante (mise à jour par agent ou HITL)"
+      - progress:     "Calculé: (current-start)/(target-start) * 100"
+      - status:       "on_track | at_risk | off_track | completed"
+      - updated_at:   "ISO date"
+
+  victory:
+    fields:
+      - title:   "Ce qui a été accompli"
+      - okr_id:  "OKR associé (optionnel)"
+      - kr_id:   "KR contribué (optionnel)"
+      - impact:  "Quantification de l'impact si possible"
+      - date:    "Date de la victoire"
+
+# ── Règles de priorisation ────────────────────────────────────────────────────
+prioritization:
+  rules:
+    - id: PRI-01
+      label: "P0 first"
+      rule: >
+        L'objectif avec le KR le plus critique (at_risk ou off_track) prime sur tout.
+        L'agent coach identifie la cause racine et propose une action corrective.
+
+    - id: PRI-02
+      label: "Pas de tâche orpheline"
+      rule: >
+        Toute tâche générée par un agent doit être reliée à un OKR.
+        Si aucun OKR ne s'applique, l'agent doit signaler l'absence d'alignement.
+
+    - id: PRI-03
+      label: "Révision hebdomadaire obligatoire"
+      rule: >
+        Chaque dimanche, l'agent coach génère un rapport OKR:
+        - KRs en retard
+        - Victoires de la semaine
+        - Recommandations d'ajustement
+        Ce rapport est soumis à dr-basalt (HITL) avant toute action corrective.
+
+    - id: PRI-04
+      label: "OKR frozen en période de freeze"
+      rule: >
+        En période de merge freeze ou de sprint critique, aucun nouvel OKR ne peut être créé.
+        Seules les mises à jour de current_value sont autorisées.
+
+# ── Calcul de progression ─────────────────────────────────────────────────────
+progress_calculation:
+  formula: "(current_value - start_value) / (target_value - start_value) * 100"
+  clamp: "[0, 100]"
+  status_thresholds:
+    on_track:   ">= 70% du temps écoulé"
+    at_risk:    "40-69% du temps écoulé"
+    off_track:  "< 40% du temps écoulé"
+    completed:  "progress >= 100"
+
+# ── OKR Engine — Triggers ─────────────────────────────────────────────────────
+triggers:
+  on_kr_update:
+    - recalculate_progress
+    - check_status_change
+    - notify_if_completed
+    - log_victory_if_completed
+
+  on_okr_completed:
+    - mark_all_krs_completed
+    - generate_retrospective
+    - suggest_next_okr
+
+  on_okr_at_risk:
+    - alert_coach_agent
+    - generate_corrective_actions
+    - hitl_review_required
+
+# ── Scorecard OKR ─────────────────────────────────────────────────────────────
+scorecard:
+  metrics:
+    - okrs_active:     "Nombre d'OKRs actifs (cible: 3-5 max)"
+    - krs_on_track:    "% KRs on_track (cible: > 70%)"
+    - krs_at_risk:     "Nombre de KRs at_risk"
+    - krs_off_track:   "Nombre de KRs off_track (alerte si > 2)"
+    - victories_week:  "Victoires cette semaine"
+    - velocity:        "KRs complétés par sprint"
+
+  green_condition: "krs_at_risk == 0 AND krs_off_track == 0"
+  red_condition:   "krs_off_track >= 2 OR any_okr.status == abandoned"
+
+# ── Intégration agents ────────────────────────────────────────────────────────
+agent_integration:
+  coach_agent:
+    reads:    [okrs, key_results, victories, journal]
+    writes:   [key_results.current_value, victories]
+    triggers: [weekly_report, corrective_action, retrospective]
+    hitl:     "required for okr creation, abandon, major adjustment"
+
+  executor_agent:
+    reads:    [okrs, key_results]
+    validates: "Toute tâche générée doit référencer un OKR ou KR"
+    blocks_if: "Aucun OKR actif trouvé"
+
+# ── Cycle de vie d'un OKR ─────────────────────────────────────────────────────
+lifecycle:
+  states:
+    draft:      "Brouillon — non pris en compte par les agents"
+    active:     "En cours — alimenté par les agents"
+    paused:     "Suspendu — freeze ou priorité changée"
+    completed:  "Tous les KRs >= 100%"
+    abandoned:  "Arrêté — post-mortem requis"
+
+  transitions:
+    draft     → active:     "dr-basalt approve (HITL)"
+    active    → paused:     "Coach agent ou dr-basalt"
+    active    → completed:  "Automatique quand tous KRs >= 100%"
+    active    → abandoned:  "HITL obligatoire + justification"
+    paused    → active:     "dr-basalt approve (HITL)"
+    completed → [archive]:  "Automatique après 30 jours"

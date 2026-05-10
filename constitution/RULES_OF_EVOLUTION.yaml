@@ -1,0 +1,175 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — Rules of Evolution
+# Comment Stern OS évolue sans casser ce qu'il a construit.
+# Chaque règle est une loi de croissance, pas une contrainte.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Philosophie d'évolution ───────────────────────────────────────────────────
+philosophy: >
+  Stern OS évolue par accumulation, jamais par réécriture.
+  Chaque version ajoute une couche — elle ne détruit pas la précédente.
+  Un système qui grandit sans règles devient une dette. Un système qui grandit
+  avec des lois devient une plateforme.
+
+# ── Règles d'accumulation ─────────────────────────────────────────────────────
+accumulation:
+  - id: EVO-01
+    label: "Additive only"
+    rule: >
+      Toute évolution ajoute des capacités. Elle ne retire jamais ce qui
+      fonctionne. Les migrations PocketBase sont additives. Les constitutions
+      sont versionnées, jamais écrasées. Les seeds sont des upserts.
+
+  - id: EVO-02
+    label: "Backward compatible"
+    rule: >
+      Toute nouvelle version de l'API MCP, du schéma PocketBase, du UI Schema
+      doit être rétrocompatible avec la version précédente.
+      Breaking change = HITL obligatoire + migration plan documentée.
+
+  - id: EVO-03
+    label: "Constitution-first"
+    rule: >
+      Avant toute évolution structurelle, mettre à jour la constitution.
+      Le code suit les lois. Les lois précèdent le code.
+      constitution/ → scripts/ → mcp-server/ → frontend/
+
+  - id: EVO-04
+    label: "Versioning sémantique"
+    rule: >
+      v0.x: expérimentation — breaking changes tolérés avec HITL
+      v1.x: production — SemVer strict (major.minor.patch)
+      Chaque changement est taggé dans git avec la version impactée.
+
+# ── Règles de déploiement ─────────────────────────────────────────────────────
+deployment:
+  - id: EVO-05
+    label: "GitOps uniquement"
+    rule: >
+      Aucun changement en production sans passer par git.
+      IA → edit → commit → push → make deploy.
+      Jamais de docker exec inline non versionné.
+      Jamais de modification directe en SSH sans commit.
+
+  - id: EVO-06
+    label: "Feature flags > breaking changes"
+    rule: >
+      Si une fonctionnalité change le comportement existant, utiliser une
+      feature flag dans la constitution ou un paramètre optionnel.
+      Activer progressivement. Rollback = désactiver le flag.
+
+  - id: EVO-07
+    label: "Health check avant promotion"
+    rule: >
+      Toute nouvelle version doit passer make health avant d'être considérée
+      stable. Critères minimaux: PocketBase /health, MCP /health,
+      frontend chargeable, Qdrant /healthz.
+
+# ── Règles de connaissance ────────────────────────────────────────────────────
+knowledge:
+  - id: EVO-08
+    label: "Tout insight est indexé"
+    rule: >
+      Toute décision architecturale, pattern identifié, leçon apprise
+      doit être indexée dans Qdrant (collection: blueprint) et Neo4j
+      (label: Insight ou Decision). Le journal est la première source.
+
+  - id: EVO-09
+    label: "Les douleurs génèrent les features"
+    rule: >
+      Aucune nouvelle feature sans douleur documentée dans Neo4j.
+      Douleur → OKR → KR → Feature → Implémentation → Victoire.
+      Les features issues de curiosité technique ne sont pas prioritaires.
+
+  - id: EVO-10
+    label: "Rétrospective post-version"
+    rule: >
+      À la fin de chaque version majeure (v0.x → v0.x+1), générer:
+      - Ce qui a fonctionné (victories)
+      - Ce qui a bloqué (douleurs)
+      - Ce qui change dans la constitution (lessons learned)
+      Stocké dans Neo4j:Retrospective + Qdrant:blueprint.
+
+# ── Règles des agents ─────────────────────────────────────────────────────────
+agents:
+  - id: EVO-11
+    label: "Un agent = un rôle"
+    rule: >
+      Chaque agent a une mission précise et un périmètre limité.
+      Interdiction de créer des agents "généralistes" qui font tout.
+      Rôles autorisés: coach, architect, ui_designer, reviewer, executor.
+
+  - id: EVO-12
+    label: "Les agents apprennent des humains"
+    rule: >
+      Toute correction humaine d'un output agent est un signal d'apprentissage.
+      L'agent l'indexe dans Qdrant (collection: corrections) et l'intègre
+      dans ses prochaines exécutions via RAG.
+
+  - id: EVO-13
+    label: "Jamais d'agent sans scorecard"
+    rule: >
+      Tout agent déployé en production doit avoir un scorecard avec au moins
+      3 métriques mesurables (ex: précision, latence, taux d'approbation HITL).
+      Un agent sans scorecard est un agent aveugle.
+
+# ── Règles de scalabilité ──────────────────────────────────────────────────────
+scalability:
+  - id: EVO-14
+    label: "Multi-tenant ready dès v0.x"
+    rule: >
+      Toute entité créée en v0.x doit avoir un champ owner ou user_id,
+      même si non utilisé. La migration multi-tenant ne doit pas être
+      une réécriture — juste une activation de champs existants.
+
+  - id: EVO-15
+    label: "No single point of truth in code"
+    rule: >
+      La configuration ne vit pas dans le code. Elle vit dans:
+      - constitution/ pour les lois
+      - PocketBase pour l'état applicatif
+      - .env pour les secrets (non versionnés)
+      - Makefile pour les procédures opérationnelles
+
+# ── Processus de proposition de changement ────────────────────────────────────
+change_process:
+  steps:
+    - propose: "Décrire le changement en langage naturel (journal ou OKR)"
+    - evaluate: "Agent architect évalue l'alignement avec la constitution"
+    - meta_ir: "Produire une Meta-IR de la modification"
+    - review: "HITL si high ou critical risk (EVO-02, EVO-06)"
+    - implement: "IA edits → git commit → git push → make deploy"
+    - validate: "make health → observer → scorecard update"
+    - learn: "Indexer le résultat dans Qdrant:blueprint"
+
+  fast_track:
+    condition: "low risk (EVO rating ≤ medium) AND no constitution change"
+    process: "Propose → Implement → Validate"
+    hitl: none
+
+  constitution_change_process:
+    condition: "Toute modification de constitution/"
+    required:
+      - "git diff affiché et relu"
+      - "Version bumped dans le fichier modifié"
+      - "Commit message avec impact décrit"
+      - "HITL approval si breaking"
+
+# ── Indicateurs de santé évolutive ────────────────────────────────────────────
+health_indicators:
+  green:
+    - "Aucune dette technique non documentée"
+    - "Toutes les constitutions versionnées et consistantes"
+    - "Roadmap actuelle alignée sur les OKRs actifs"
+    - "Scorecard de tous les agents dans le vert"
+
+  amber:
+    - "1-2 dettes techniques non résolues"
+    - "Constitution partiellement mise à jour"
+    - "Agent sans scorecard en production"
+
+  red:
+    - "Dette technique bloquante (> 3 issues critiques)"
+    - "Constitution en contradiction avec le code déployé"
+    - "Agents en production sans supervision HITL"
+    - "Git history non linéaire (force push non justifié)"

@@ -1,0 +1,168 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — HITL Contract (Human-In-The-Loop)
+# Définit précisément où et comment l'humain intervient dans le système.
+# Sans ce contrat, les agents sont aveugles à leurs propres risques.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Philosophie HITL ──────────────────────────────────────────────────────────
+philosophy: >
+  L'IA exécute. L'humain gouverne.
+  Le HITL n'est pas un frein à l'autonomie — c'est ce qui la rend possible.
+  Sans supervision humaine structurée, l'autonomie devient du chaos.
+  dr-basalt peut lire, corriger, approuver, bloquer, rollback à tout moment.
+
+# ── Surfaces de contrôle ──────────────────────────────────────────────────────
+surfaces:
+  read:
+    description: "Accès total en lecture à toute décision, log, schéma généré"
+    tools: [journal, okr_progress, agent_run_trace, data_gate_status, mcp_list]
+    always_available: true
+
+  correct:
+    description: "Modifier tout fichier, schéma, config directement via git"
+    method: "Edit file → git commit → git push → make deploy"
+    always_available: true
+
+  approve:
+    description: "Validation explicite avant exécution d'une action irréversible"
+    triggers: [delete, production_change, credential_update, schema_breaking_change]
+    timeout: "Si pas de réponse en 24h → action annulée, pas exécutée"
+
+  block:
+    description: "Bloquer toute action à tout moment, même en cours"
+    method: "Signal STOP dans journal → agent stoppe l'itération courante"
+    immediate: true
+
+  annotate:
+    description: "Annoter les insights, patterns, décisions dans le journal"
+    targets: [neo4j_insights, qdrant_insights, victory_log]
+
+  trigger:
+    description: "Déclencher manuellement tout workflow ou agent"
+    surfaces: [mcp_execute, windmill_trigger, makefile_target]
+
+  rollback:
+    description: "Revenir à tout état git précédent"
+    method: "git revert ou git reset (HITL sur reset --hard)"
+    always_available: true
+
+  override:
+    description: "Override toute règle P0 avec justification documentée"
+    constraint: "Doit être loggé dans journal avec raison + impact attendu"
+    hitl: "Toujours approuvé par dr-basalt, jamais décidé par agent"
+
+# ── Gates HITL obligatoires ───────────────────────────────────────────────────
+required_gates:
+
+  - id: HITL-01
+    action: "DELETE toute entité (OKR, data_gate, record PocketBase)"
+    rule: "L'agent prépare l'action, l'affiche, attend confirmation explicite"
+    timeout_behavior: "Annulation automatique"
+    exception: "Jamais — même si delete_confirmed=true dans le prompt"
+
+  - id: HITL-02
+    action: "Production change (nouveau service, port ouvert, Traefik rule)"
+    rule: "Générer make deploy seulement après validation dr-basalt"
+    check: "git diff doit être affiché et relu avant push"
+
+  - id: HITL-03
+    action: "Credential update (nouveau secret, rotation token)"
+    rule: "Afficher le nom de la variable, jamais la valeur, attendre confirmation"
+    log: "Entrée dans journal: 'Credential X mis à jour le <date>'"
+
+  - id: HITL-04
+    action: "Schema breaking change (migration PocketBase destructive)"
+    rule: "Migration additive uniquement sauf HITL explicite"
+    check: "Agent vérifie que la migration ne supprime pas de données"
+
+  - id: HITL-05
+    action: "External message send (email, Slack, webhook externe)"
+    rule: "Afficher le contenu du message, attendre confirmation avant envoi"
+    exception: "Webhooks internes (Windmill, MCP interne) non concernés"
+
+  - id: HITL-06
+    action: "Agent spawn (création d'un nouvel agent autonome)"
+    rule: "Définir le rôle, la mission, les contraintes, les tools autorisés"
+    review: "dr-basalt approve le manifeste agent avant démarrage"
+
+  - id: HITL-07
+    action: "OKR création ou abandon"
+    rule: "OKR soumis à dr-basalt avec justification → approbation → activation"
+
+  - id: HITL-08
+    action: "Data Gate vers un système externe (push to S3, push to GitHub)"
+    rule: "Afficher ce qui sera publié/poussé, attendre confirmation"
+
+# ── Niveaux de risque ─────────────────────────────────────────────────────────
+risk_levels:
+  low:
+    description: "Actions locales, réversibles, sans impact externe"
+    examples: [read_file, list_data_gates, semantic_search, embed_and_upsert]
+    hitl: none
+    auto_execute: true
+
+  medium:
+    description: "Actions modifiant l'état interne, réversibles via git"
+    examples: [create_okr, update_kr, create_data_gate, trigger_sync]
+    hitl: "Log automatique dans journal"
+    auto_execute: true
+
+  high:
+    description: "Actions modifiant infrastructure ou état persistant externe"
+    examples: [make_deploy, rebuild_container, new_traefik_route]
+    hitl: "Affichage + attente confirmation"
+    auto_execute: false
+
+  critical:
+    description: "Actions irréversibles ou visibles à l'extérieur"
+    examples: [delete_collection, send_email, rotate_credential, force_push]
+    hitl: "HITL obligatoire + justification loggée"
+    auto_execute: false
+
+# ── Protocole d'approbation ───────────────────────────────────────────────────
+approval_protocol:
+  channels:
+    - journal_entry: "L'agent écrit l'action dans le journal quotidien avec [PENDING APPROVAL]"
+    - mcp_notification: "L'agent appelle notify_hitl_required (si disponible)"
+    - ui_badge: "Badge rouge sur l'action dans le cockpit frontend"
+
+  formats:
+    approval_request: |
+      [HITL-REQUIRED]
+      Action: <description précise>
+      Risque: <low | medium | high | critical>
+      Réversible: <oui | non>
+      Impact: <ce qui va changer>
+      Rollback: <comment défaire si besoin>
+      Commande: <la commande exacte qui sera exécutée>
+      ---
+      Approuver: répondre OUI dans le journal ou dans le cockpit
+      Refuser: répondre NON ou ne pas répondre (timeout = refus)
+
+  confirmation_signals:
+    approved: ["OUI", "ok", "go", "approve", "✓", "yes"]
+    rejected:  ["NON", "non", "stop", "cancel", "✗", "no", "abort"]
+
+# ── Audit trail ───────────────────────────────────────────────────────────────
+audit:
+  all_hitl_actions:
+    stored_in: "PocketBase.journal_entries + Neo4j.Decision nodes"
+    fields:
+      - timestamp:     "ISO date exacte"
+      - agent_id:      "Qui a demandé l'approbation"
+      - action:        "Description de l'action"
+      - risk_level:    "low | medium | high | critical"
+      - approved_by:   "dr-basalt ou auto (si low)"
+      - approved_at:   "ISO date"
+      - executed:      "true | false"
+      - outcome:       "success | failed | rolled_back"
+      - rollback_info: "Instructions rollback si applicable"
+
+  retention: "90 jours minimum — jamais supprimé automatiquement"
+
+# ── Stop conditions HITL ──────────────────────────────────────────────────────
+stop_conditions:
+  - error_budget_exceeded: "Trop d'erreurs consécutives → HITL obligatoire avant reprise"
+  - human_veto:            "dr-basalt envoie STOP → agent stoppe immédiatement"
+  - loop_detected:         "Agent en boucle infinie → auto-stop + HITL"
+  - okr_conflict:          "Deux agents en conflit sur un OKR → arbitrage humain"
