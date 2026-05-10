@@ -3,6 +3,7 @@ import { serve } from '@hono/node-server'
 import { cors } from 'hono/cors'
 import neo4j from 'neo4j-driver'
 import PocketBase from 'pocketbase'
+import { createDirectus, rest, authentication, readItems, readItem, createItem, updateItem, deleteItem } from '@directus/sdk'
 
 const app = new Hono()
 
@@ -12,8 +13,14 @@ const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || 'SternOS2026xNeo4j'
 const PB_URL = process.env.PB_URL || 'http://sternos-pb:8090'
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@ori3com.cloud'
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'SternOS2026!'
+const DIRECTUS_URL = process.env.DIRECTUS_URL || 'http://sternos-directus:8055'
+const DIRECTUS_ADMIN_EMAIL = process.env.DIRECTUS_ADMIN_EMAIL || 'admin@stern-os.local'
+const DIRECTUS_ADMIN_PASSWORD = process.env.DIRECTUS_ADMIN_PASSWORD || 'SternOS2026!'
 const QDRANT_URL = process.env.QDRANT_URL || 'http://sternos-qdrant:6333'
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || ''
+
+// Use Directus as primary data source if available, PocketBase as fallback
+const USE_DIRECTUS = process.env.USE_DIRECTUS === 'true'
 
 let driver
 try {
@@ -28,6 +35,50 @@ async function authPb() {
   try {
     await pb.admins.authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD)
   } catch {}
+}
+
+// ── Directus client ────────────────────────────────────────────────────────
+let _directusToken = null
+let _directusTokenExpiry = 0
+
+async function getDirectusClient() {
+  const client = createDirectus(DIRECTUS_URL).with(authentication()).with(rest())
+  const now = Date.now()
+  if (!_directusToken || now > _directusTokenExpiry) {
+    try {
+      const result = await client.login(DIRECTUS_ADMIN_EMAIL, DIRECTUS_ADMIN_PASSWORD)
+      _directusToken = result.access_token
+      _directusTokenExpiry = now + 14 * 60 * 1000 // 14 min
+    } catch (e) {
+      console.warn('Directus auth failed:', e.message)
+    }
+  }
+  return client
+}
+
+async function directusList(collection, options = {}) {
+  const client = await getDirectusClient()
+  return client.request(readItems(collection, { limit: -1, ...options }))
+}
+
+async function directusGetOne(collection, id) {
+  const client = await getDirectusClient()
+  return client.request(readItem(collection, id))
+}
+
+async function directusCreate(collection, data) {
+  const client = await getDirectusClient()
+  return client.request(createItem(collection, data))
+}
+
+async function directusUpdate(collection, id, data) {
+  const client = await getDirectusClient()
+  return client.request(updateItem(collection, id, data))
+}
+
+async function directusDelete(collection, id) {
+  const client = await getDirectusClient()
+  return client.request(deleteItem(collection, id))
 }
 
 app.use('*', cors())
@@ -50,7 +101,7 @@ async function embedText(text) {
 // ── MCP Manifest ────────────────────────────────────────────────────────────
 app.get('/', (c) => c.json({
   name: 'SternOS MCP',
-  version: '1.3.0',
+  version: '1.4.0',
   description: 'SternOS — Cognitive OS for dr-basalt. Persona graph, OKRs, tasks, roadmap, vector search, data gates SCRUD.',
   server: 'stern-os-brain 46.224.111.203',
   tools: [
@@ -278,7 +329,7 @@ app.get('/', (c) => c.json({
 
 // ── Health ────────────────────────────────────────────────────────────────
 app.get('/health', async (c) => {
-  const checks = { mcp: 'ok', neo4j: 'unknown', pocketbase: 'unknown' }
+  const checks = { mcp: 'ok', neo4j: 'unknown', pocketbase: 'unknown', directus: 'unknown', data_source: USE_DIRECTUS ? 'directus' : 'pocketbase' }
 
   if (driver) {
     try {
@@ -296,6 +347,13 @@ app.get('/health', async (c) => {
     checks.pocketbase = 'ok'
   } catch (e) {
     checks.pocketbase = 'error: ' + e.message
+  }
+
+  try {
+    const res = await fetch(`${DIRECTUS_URL}/server/health`)
+    checks.directus = res.ok ? 'ok' : 'error: ' + res.status
+  } catch (e) {
+    checks.directus = 'error: ' + e.message
   }
 
   return c.json(checks)
@@ -332,6 +390,13 @@ app.post('/tools/get_context', async (c) => {
 // ── Tool: get_okrs ────────────────────────────────────────────────────────
 app.post('/tools/get_okrs', async (c) => {
   try {
+    if (USE_DIRECTUS) {
+      const [okrs, krs] = await Promise.all([
+        directusList('objectives', { filter: { status: { _neq: 'abandoned' } } }),
+        directusList('key_results'),
+      ])
+      return c.json({ okrs, key_results: krs })
+    }
     await authPb()
     const okrs = await pb.collection('objectives').getFullList({ filter: 'status != "abandoned"' })
     const krs = await pb.collection('key_results').getFullList()
@@ -344,15 +409,20 @@ app.post('/tools/get_okrs', async (c) => {
 // ── Tool: create_task ─────────────────────────────────────────────────────
 app.post('/tools/create_task', async (c) => {
   const body = await c.req.json()
+  const taskData = {
+    title: body.title,
+    status: body.status || 'todo',
+    priority: body.priority || 1,
+    due_date: body.due_date || null,
+    notes: body.notes || null,
+  }
   try {
+    if (USE_DIRECTUS) {
+      const task = await directusCreate('tasks', taskData)
+      return c.json(task)
+    }
     await authPb()
-    const task = await pb.collection('tasks').create({
-      title: body.title,
-      status: body.status || 'todo',
-      priority: body.priority || 1,
-      due_date: body.due_date || '',
-      notes: body.notes || '',
-    })
+    const task = await pb.collection('tasks').create({ ...taskData, due_date: taskData.due_date || '', notes: taskData.notes || '' })
     return c.json(task)
   } catch (e) {
     return c.json({ error: e.message }, 500)
@@ -363,6 +433,10 @@ app.post('/tools/create_task', async (c) => {
 app.post('/tools/update_kr_progress', async (c) => {
   const { kr_id, current_value } = await c.req.json()
   try {
+    if (USE_DIRECTUS) {
+      const kr = await directusUpdate('key_results', kr_id, { current_value })
+      return c.json(kr)
+    }
     await authPb()
     const kr = await pb.collection('key_results').update(kr_id, { current_value })
     return c.json(kr)
@@ -374,9 +448,17 @@ app.post('/tools/update_kr_progress', async (c) => {
 // ── Tool: get_roadmap ─────────────────────────────────────────────────────
 app.post('/tools/get_roadmap', async (c) => {
   try {
-    await authPb()
-    const okrs = await pb.collection('objectives').getFullList({ filter: 'status != "abandoned"', sort: 'deadline' })
-    const krs = await pb.collection('key_results').getFullList()
+    let okrs, krs
+    if (USE_DIRECTUS) {
+      ;[okrs, krs] = await Promise.all([
+        directusList('objectives', { filter: { status: { _neq: 'abandoned' } }, sort: ['deadline'] }),
+        directusList('key_results'),
+      ])
+    } else {
+      await authPb()
+      okrs = await pb.collection('objectives').getFullList({ filter: 'status != "abandoned"', sort: 'deadline' })
+      krs = await pb.collection('key_results').getFullList()
+    }
 
     let p0s = []
     if (driver) {
@@ -441,6 +523,10 @@ app.post('/tools/semantic_search', async (c) => {
 // ── Tool: list_data_gates ─────────────────────────────────────────────────
 app.post('/tools/list_data_gates', async (c) => {
   try {
+    if (USE_DIRECTUS) {
+      const gates = await directusList('data_gates', { sort: ['name'] })
+      return c.json({ gates })
+    }
     await authPb()
     const gates = await pb.collection('data_gates').getFullList({ sort: 'name' })
     return c.json({ gates })
@@ -481,6 +567,11 @@ app.post('/tools/trigger_sync', async (c) => {
 // ── Data Gates SCRUD ──────────────────────────────────────────────────────
 
 async function findGate(name, id) {
+  if (USE_DIRECTUS) {
+    if (id) return directusGetOne('data_gates', id)
+    const list = await directusList('data_gates', { filter: { name: { _eq: name } } })
+    return list[0] || null
+  }
   if (id) return pb.collection('data_gates').getOne(id)
   const list = await pb.collection('data_gates').getFullList({
     filter: `name = "${name.replace(/"/g, '\\"')}"`
@@ -491,6 +582,10 @@ async function findGate(name, id) {
 app.post('/tools/create_data_gate', async (c) => {
   const body = await c.req.json()
   try {
+    if (USE_DIRECTUS) {
+      const gate = await directusCreate('data_gates', { ...body, status: body.status || 'pending' })
+      return c.json(gate)
+    }
     await authPb()
     const gate = await pb.collection('data_gates').create({
       ...body,
@@ -504,7 +599,7 @@ app.post('/tools/create_data_gate', async (c) => {
 app.post('/tools/get_data_gate', async (c) => {
   const { name, id } = await c.req.json()
   try {
-    await authPb()
+    if (!USE_DIRECTUS) await authPb()
     const gate = await findGate(name, id)
     return gate ? c.json(gate) : c.json({ error: 'Not found' }, 404)
   } catch (e) { return c.json({ error: e.message }, 500) }
@@ -513,10 +608,12 @@ app.post('/tools/get_data_gate', async (c) => {
 app.post('/tools/update_data_gate', async (c) => {
   const { name, id, ...data } = await c.req.json()
   try {
-    await authPb()
+    if (!USE_DIRECTUS) await authPb()
     const gate = await findGate(name, id)
     if (!gate) return c.json({ error: 'Not found' }, 404)
-    const updated = await pb.collection('data_gates').update(gate.id, data)
+    const updated = USE_DIRECTUS
+      ? await directusUpdate('data_gates', gate.id, data)
+      : await pb.collection('data_gates').update(gate.id, data)
     return c.json(updated)
   } catch (e) { return c.json({ error: e.message }, 500) }
 })
@@ -524,10 +621,14 @@ app.post('/tools/update_data_gate', async (c) => {
 app.post('/tools/delete_data_gate', async (c) => {
   const { name, id } = await c.req.json()
   try {
-    await authPb()
+    if (!USE_DIRECTUS) await authPb()
     const gate = await findGate(name, id)
     if (!gate) return c.json({ error: 'Not found' }, 404)
-    await pb.collection('data_gates').delete(gate.id)
+    if (USE_DIRECTUS) {
+      await directusDelete('data_gates', gate.id)
+    } else {
+      await pb.collection('data_gates').delete(gate.id)
+    }
     return c.json({ success: true, deleted: gate.name })
   } catch (e) { return c.json({ error: e.message }, 500) }
 })
@@ -535,15 +636,23 @@ app.post('/tools/delete_data_gate', async (c) => {
 app.post('/tools/search_data_gates', async (c) => {
   const { type, role, enabled, query } = await c.req.json()
   try {
-    await authPb()
-    const filters = []
-    if (type) filters.push(`type = "${type}"`)
-    if (role) filters.push(`role = "${role}"`)
-    if (enabled !== undefined) filters.push(`enabled = ${enabled}`)
-    const gates = await pb.collection('data_gates').getFullList({
-      filter: filters.join(' && ') || undefined,
-      sort: 'name'
-    })
+    let gates
+    if (USE_DIRECTUS) {
+      const filter = {}
+      if (type) filter.type = { _eq: type }
+      if (role) filter.role = { _eq: role }
+      gates = await directusList('data_gates', { filter, sort: ['name'] })
+    } else {
+      await authPb()
+      const filters = []
+      if (type) filters.push(`type = "${type}"`)
+      if (role) filters.push(`role = "${role}"`)
+      if (enabled !== undefined) filters.push(`enabled = ${enabled}`)
+      gates = await pb.collection('data_gates').getFullList({
+        filter: filters.join(' && ') || undefined,
+        sort: 'name'
+      })
+    }
     const results = query
       ? gates.filter(g =>
           g.name?.includes(query) ||
@@ -559,15 +668,24 @@ app.post('/tools/get_okr_detail', async (c) => {
   const { okr_id } = await c.req.json()
   if (!okr_id) return c.json({ error: 'okr_id required' }, 400)
   try {
-    await authPb()
-    const okr = await pb.collection('objectives').getOne(okr_id)
-    const krs = await pb.collection('key_results').getFullList({ filter: `objective = "${okr_id}"`, sort: 'created' })
-    const tasks = await pb.collection('tasks').getFullList({
-      filter: 'status != "done" && status != "cancelled"', sort: '-priority'
-    }).catch(() => [])
-    const victories = await pb.collection('victories').getFullList({ sort: '-created' }).catch(() => [])
-    const krIds = krs.map(kr => kr.id)
-    const linkedVictories = victories.filter(v => krIds.includes(v.key_result)).slice(0, 5)
+    let okr, krs, tasks, victories
+    if (USE_DIRECTUS) {
+      ;[okr, krs, tasks, victories] = await Promise.all([
+        directusGetOne('objectives', okr_id),
+        directusList('key_results', { filter: { objective: { _eq: okr_id } } }),
+        directusList('tasks', { filter: { status: { _nin: ['done', 'cancelled'] } }, sort: ['-priority'] }).catch(() => []),
+        directusList('victories', { filter: { objective: { _eq: okr_id } }, sort: ['-date'], limit: 5 }).catch(() => []),
+      ])
+    } else {
+      await authPb()
+      okr = await pb.collection('objectives').getOne(okr_id)
+      krs = await pb.collection('key_results').getFullList({ filter: `objective = "${okr_id}"`, sort: 'created' })
+      tasks = await pb.collection('tasks').getFullList({ filter: 'status != "done" && status != "cancelled"', sort: '-priority' }).catch(() => [])
+      const allVictories = await pb.collection('victories').getFullList({ sort: '-created' }).catch(() => [])
+      const krIds = krs.map(kr => kr.id)
+      victories = allVictories.filter(v => krIds.includes(v.key_result)).slice(0, 5)
+    }
+    const linkedVictories = victories.slice(0, 5)
 
     let semanticContext = []
     try {
@@ -586,9 +704,19 @@ app.post('/tools/get_okr_detail', async (c) => {
 // ── Tool: get_daily_briefing ──────────────────────────────────────────────────
 app.post('/tools/get_daily_briefing', async (c) => {
   try {
-    await authPb()
-    const okrs = await pb.collection('objectives').getFullList({ filter: 'status = "active"', sort: 'deadline' })
-    const krs = await pb.collection('key_results').getFullList()
+    let okrs, krs, tasks
+    if (USE_DIRECTUS) {
+      ;[okrs, krs, tasks] = await Promise.all([
+        directusList('objectives', { filter: { status: { _eq: 'active' } }, sort: ['deadline'] }),
+        directusList('key_results'),
+        directusList('tasks', { filter: { status: { _in: ['todo', 'in_progress'] } }, sort: ['-priority'] }).catch(() => []),
+      ])
+    } else {
+      await authPb()
+      okrs = await pb.collection('objectives').getFullList({ filter: 'status = "active"', sort: 'deadline' })
+      krs = await pb.collection('key_results').getFullList()
+      tasks = await pb.collection('tasks').getFullList({ filter: 'status = "todo" || status = "in_progress"', sort: '-priority' }).catch(() => [])
+    }
 
     let p0s = []
     if (driver) {
@@ -618,10 +746,6 @@ app.post('/tools/get_daily_briefing', async (c) => {
       insights = (await res.json()).result || []
     } catch (_) {}
 
-    const tasks = await pb.collection('tasks').getFullList({
-      filter: 'status = "todo" || status = "in_progress"', sort: '-priority'
-    }).catch(() => [])
-
     return c.json({
       generated_at: new Date().toISOString(),
       p0: p0s[0] || null,
@@ -639,6 +763,11 @@ app.post('/tools/get_ui_schema', async (c) => {
   const { page_id } = await c.req.json()
   if (!page_id) return c.json({ error: 'page_id required' }, 400)
   try {
+    if (USE_DIRECTUS) {
+      const schemas = await directusList('ui_schemas', { filter: { page_id: { _eq: page_id } } })
+      if (!schemas[0]) return c.json({ error: `UI Schema not found: ${page_id}` }, 404)
+      return c.json(schemas[0])
+    }
     await authPb()
     const schemas = await pb.collection('ui_schemas').getFullList({ filter: `page_id = "${page_id}"` })
     if (!schemas[0]) return c.json({ error: `UI Schema not found: ${page_id}` }, 404)
@@ -662,9 +791,16 @@ app.post('/tools/create_ui_schema', async (c) => {
   if (invalid.length > 0) return c.json({ error: `Invalid widget types: ${invalid.map(w => w.type).join(', ')}`, valid_types: VALID_WIDGET_TYPES }, 400)
 
   try {
+    const data = { page_id, title, intent, layout, widgets, version: version || '1.0.0', active: true }
+    if (USE_DIRECTUS) {
+      const existing = await directusList('ui_schemas', { filter: { page_id: { _eq: page_id } } })
+      const result = existing[0]
+        ? await directusUpdate('ui_schemas', existing[0].id, data)
+        : await directusCreate('ui_schemas', data)
+      return c.json(result)
+    }
     await authPb()
     const existing = await pb.collection('ui_schemas').getFullList({ filter: `page_id = "${page_id}"` })
-    const data = { page_id, title, intent, layout, widgets, version: version || '1.0.0', active: true }
     const result = existing[0]
       ? await pb.collection('ui_schemas').update(existing[0].id, data)
       : await pb.collection('ui_schemas').create(data)
@@ -679,14 +815,25 @@ app.post('/tools/generate_ui_schema', async (c) => {
 
   let okrContext = ''
   try {
-    await authPb()
-    if (context_okr_id) {
-      const okr = await pb.collection('objectives').getOne(context_okr_id)
-      const krs = await pb.collection('key_results').getFullList({ filter: `objective = "${context_okr_id}"` })
-      okrContext = `OKR: "${okr.title}" — KRs: ${krs.map(kr => kr.title).join(', ')}`
+    if (USE_DIRECTUS) {
+      if (context_okr_id) {
+        const okr = await directusGetOne('objectives', context_okr_id)
+        const krs = await directusList('key_results', { filter: { objective: { _eq: context_okr_id } } })
+        okrContext = `OKR: "${okr.title}" — KRs: ${krs.map(kr => kr.title).join(', ')}`
+      } else {
+        const okrs = await directusList('objectives', { filter: { status: { _eq: 'active' } } })
+        okrContext = `OKRs actifs: ${okrs.map(o => o.title).join(', ')}`
+      }
     } else {
-      const okrs = await pb.collection('objectives').getFullList({ filter: 'status = "active"' })
-      okrContext = `OKRs actifs: ${okrs.map(o => o.title).join(', ')}`
+      await authPb()
+      if (context_okr_id) {
+        const okr = await pb.collection('objectives').getOne(context_okr_id)
+        const krs = await pb.collection('key_results').getFullList({ filter: `objective = "${context_okr_id}"` })
+        okrContext = `OKR: "${okr.title}" — KRs: ${krs.map(kr => kr.title).join(', ')}`
+      } else {
+        const okrs = await pb.collection('objectives').getFullList({ filter: 'status = "active"' })
+        okrContext = `OKRs actifs: ${okrs.map(o => o.title).join(', ')}`
+      }
     }
   } catch (_) {}
 
@@ -721,21 +868,31 @@ Réponds UNIQUEMENT avec un JSON valide.`
 
     if (!schema.page_id) schema.page_id = 'generated_' + Date.now()
 
-    await authPb()
-    const existing = await pb.collection('ui_schemas').getFullList({ filter: `page_id = "${schema.page_id}"` })
-    const result = existing[0]
-      ? await pb.collection('ui_schemas').update(existing[0].id, { ...schema, active: true })
-      : await pb.collection('ui_schemas').create({ ...schema, version: '1.0.0', active: true })
+    let result
+    if (USE_DIRECTUS) {
+      const existing = await directusList('ui_schemas', { filter: { page_id: { _eq: schema.page_id } } })
+      result = existing[0]
+        ? await directusUpdate('ui_schemas', existing[0].id, { ...schema, active: true })
+        : await directusCreate('ui_schemas', { ...schema, version: '1.0.0', active: true })
+    } else {
+      await authPb()
+      const existing = await pb.collection('ui_schemas').getFullList({ filter: `page_id = "${schema.page_id}"` })
+      result = existing[0]
+        ? await pb.collection('ui_schemas').update(existing[0].id, { ...schema, active: true })
+        : await pb.collection('ui_schemas').create({ ...schema, version: '1.0.0', active: true })
+    }
 
     return c.json({ success: true, page_id: schema.page_id, schema: result })
   } catch (e) { return c.json({ error: e.message }, 500) }
 })
 
 serve({ fetch: app.fetch, port: 3001 }, (info) => {
-  console.log(`\nSternOS MCP Server`)
+  console.log(`\nSternOS MCP Server v1.4.0`)
   console.log(`   Port: ${info.port}`)
+  console.log(`   Data source: ${USE_DIRECTUS ? 'Directus' : 'PocketBase'}`)
   console.log(`   Neo4j: ${NEO4J_URI}`)
   console.log(`   PB: ${PB_URL}`)
+  console.log(`   Directus: ${DIRECTUS_URL}`)
   console.log(`   Qdrant: ${QDRANT_URL}`)
   console.log(`   Ready.\n`)
 })

@@ -12,8 +12,9 @@ SSH        = ssh -i $(SSH_KEY) -o StrictHostKeyChecking=no $(BRAIN)
 REMOTE_DIR = /opt/stern-os
 
 .PHONY: up down restart logs ps build dev-up setup o3c-up o3c-down o3c-build o3c-logs gen-basicauth \
-        deploy deploy-all pull-remote rebuild-mcp rebuild-frontend rebuild-pb rebuild-soma \
+        deploy deploy-all pull-remote rebuild-mcp rebuild-frontend rebuild-frontend-v1 rebuild-pb rebuild-soma \
         seed-gates fix-pb-schema init-qdrant seed-ui-schemas index-okrs sync-vault sync-all \
+        setup-directus migrate-pb-to-directus \
         status health mcp-tools
 
 # ─── Production ───────────────────────────────────────────────────────────────
@@ -115,6 +116,9 @@ rebuild-pb:
 rebuild-soma:
 	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build soma --no-cache && docker compose up -d soma"
 
+rebuild-frontend-v1:
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build sternos-next --no-cache && docker compose up -d sternos-next"
+
 # Rebuild tout (après changement docker-compose ou multi-services)
 deploy-all:
 	$(SSH) "cd $(REMOTE_DIR) && git pull && docker compose build --no-cache && docker compose up -d"
@@ -157,6 +161,16 @@ sync-vault:
 
 # Tout synchroniser (OKRs + vault)
 sync-all: index-okrs sync-vault
+
+# Setup schema Directus (collections + permissions)
+setup-directus:
+	@echo "→ Setting up Directus schema on stern-os-brain..."
+	$(SSH) "cd $(REMOTE_DIR) && git pull && docker exec sternos-soma node /opt/stern-os/scripts/setup-directus.js"
+
+# Migration PocketBase → Directus (idempotent)
+migrate-pb-to-directus:
+	@echo "→ Migrating PocketBase data to Directus on stern-os-brain..."
+	$(SSH) "docker exec sternos-soma node /opt/stern-os/scripts/migrate-pb-to-directus.js"
 
 # ─── Observabilité ────────────────────────────────────────────────────────────
 

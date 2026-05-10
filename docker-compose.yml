@@ -176,8 +176,89 @@ services:
         aliases:
           - sternos-qdrant
 
+  # ─── PostgreSQL — base relationnelle partagée Directus + Payload ─────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sternos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sternos}
+      POSTGRES_USER: ${POSTGRES_USER:-sternos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sternos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Directus — control plane data/schema studio ─────────────────────────
+  directus:
+    image: directus/directus:latest
+    container_name: sternos-directus
+    restart: unless-stopped
+    environment:
+      SECRET: ${DIRECTUS_SECRET}
+      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL:-admin@ori3com.cloud}
+      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
+      DB_CLIENT: pg
+      DB_HOST: sternos-postgres
+      DB_PORT: "5432"
+      DB_DATABASE: ${POSTGRES_DB:-sternos}
+      DB_USER: ${POSTGRES_USER:-sternos}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_SCHEMA: directus
+      WEBSOCKETS_ENABLED: "true"
+      PUBLIC_URL: https://directus.${DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.directus.rule=Host(`directus.${DOMAIN}`)"
+      - "traefik.http.routers.directus.entrypoints=websecure"
+      - "traefik.http.routers.directus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.directus.loadbalancer.server.port=8055"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8055/server/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── Next.js + Payload — cockpit applicatif SternOS ──────────────────────
+  # Note: container sternos-next buildé depuis app/ (Next.js 15 + Payload v3)
+  # Déployé en Phase 3 — app/ directory pas encore créé
+  # sternos-next:
+  #   build: ./app
+  #   container_name: sternos-next
+  #   restart: unless-stopped
+  #   environment:
+  #     DATABASE_URI: postgresql://${POSTGRES_USER:-sternos}:${POSTGRES_PASSWORD}@sternos-postgres:5432/${POSTGRES_DB:-sternos}?schema=payload
+  #     PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+  #     DIRECTUS_URL: http://sternos-directus:8055
+  #     DIRECTUS_ADMIN_TOKEN: ${DIRECTUS_ADMIN_TOKEN}
+  #     NEO4J_URI: bolt://${NEO4J_HOST:-172.19.0.2}:7687
+  #     NEO4J_PASSWORD: ${NEO4J_PASSWORD:-SternOS2026xNeo4j}
+  #     QDRANT_URL: http://sternos-qdrant:6333
+  #     MCP_URL: http://sternos-mcp:3001
+  #     NEXT_PUBLIC_MCP_URL: https://mcp.${DOMAIN}
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     directus:
+  #       condition: service_healthy
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.next.rule=Host(`app.${DOMAIN}`)"
+  #     - "traefik.http.routers.next.entrypoints=websecure"
+  #     - "traefik.http.routers.next.tls.certresolver=letsencrypt"
+  #     - "traefik.http.services.next.loadbalancer.server.port=3000"
+
 volumes:
   pb_data:
   wm_pg_data:
   acme_data:
   qdrant_data:
+  postgres_data:
