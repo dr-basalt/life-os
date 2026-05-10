@@ -19,6 +19,7 @@ COPY --from=builder /app/payload.config.ts ./payload.config.ts
 COPY --from=builder /app/src ./src
 COPY package*.json ./
 COPY next.config.ts ./
+COPY tsconfig.json ./
 
 EXPOSE 3000
 CMD ["sh", "-c", "node_modules/.bin/payload migrate 2>/dev/null || true && node_modules/.bin/next start"]
