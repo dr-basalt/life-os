@@ -1,0 +1,145 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — Meta-Model SCRUDX
+# Langage universel pour toute entité du système.
+# Toute entité respecte ce contrat structurel.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Opérations universelles ───────────────────────────────────────────────────
+scrudx:
+  operations:
+    search:  "Recherche sémantique ou filtrée sur toute collection"
+    create:  "Créer une nouvelle instance d'entité"
+    read:    "Lire une instance par ID ou nom"
+    update:  "Modifier une instance existante (PATCH, non destructif)"
+    delete:  "Supprimer — toujours avec HITL si destructif"
+    execute: "Déclencher une action métier (sync, run, trigger, generate)"
+
+# ── Contrat d'entité ──────────────────────────────────────────────────────────
+entity:
+  required_fields:
+    - id:         "UUID ou slug unique"
+    - type:       "Type sémantique de l'entité"
+    - schema:     "JSON Schema ou Zod schema validant la structure"
+    - lifecycle:  "États possibles + transitions autorisées"
+    - created_at: "ISO date de création"
+    - updated_at: "ISO date de dernière modification"
+  optional_fields:
+    - relations:    "Relations vers d'autres entités (Neo4j)"
+    - permissions:  "Règles d'accès (RBAC)"
+    - version:      "Numéro de version sémantique"
+    - tags:         "Labels libres pour groupement/filtrage"
+    - metadata:     "Données contextuelles arbitraires (JSON)"
+
+# ── Contrat d'outil (Tool) ────────────────────────────────────────────────────
+tool:
+  required:
+    - name:               "Identifiant unique"
+    - description:        "Ce que fait l'outil, pour qui"
+    - inputs:             "Paramètres attendus (typed)"
+    - outputs:            "Sorties garanties (typed)"
+    - dependencies:       "Services/envvars requis"
+  optional:
+    - install_strategy:   "Comment installer/déployer cet outil"
+    - execution_strategy: "sync | async | streaming"
+    - timeout_ms:         "Timeout d'exécution"
+    - requires_hitl:      "Nécessite validation humaine"
+    - observability:      "Traces, métriques, logs attendus"
+
+# ── Contrat d'agent ───────────────────────────────────────────────────────────
+agent:
+  required:
+    - id:          "Identifiant unique"
+    - role:        "Rôle sémantique (coach, architect, reviewer, executor, ui_designer)"
+    - mission:     "Ce que l'agent doit accomplir"
+    - tools:       "Liste des tools autorisés"
+    - constraints: "Ce que l'agent n'a PAS le droit de faire"
+  optional:
+    - memory:      "Accès mémoire (Qdrant, Neo4j, PocketBase)"
+    - workflows:   "Workflows que l'agent peut déclencher"
+    - scorecard:   "KPIs mesurant la qualité de l'agent"
+    - max_iterations: "Nombre max d'itérations dans une boucle agentique"
+    - constitution_ref: "Chemin vers la constitution lue avant chaque action"
+
+# ── Contrat de workflow ───────────────────────────────────────────────────────
+workflow:
+  required:
+    - id:       "Identifiant unique"
+    - name:     "Nom lisible"
+    - triggers: "Ce qui déclenche le workflow (cron, event, manual, webhook)"
+    - steps:    "Liste ordonnée d'étapes (tool calls, agent calls, decisions)"
+  optional:
+    - validation: "Étape de validation avant/après exécution"
+    - rollback:   "Étape de compensation en cas d'échec"
+    - hitl_gates: "Points d'arrêt pour validation humaine"
+    - outputs:    "Ce que le workflow produit"
+    - schedule:   "Expression cron si déclenchement planifié"
+
+# ── Contrat de Data Gate ──────────────────────────────────────────────────────
+data_gate:
+  required:
+    - name:        "Nom unique"
+    - type:        "obsidian | git | api | graphql | rss | database | sql | mcp | s3 | syncthing | webhook | k8s | ollama | smtp | redis"
+    - role:        "knowledge_source | ai_provider | storage | compute | workflow | calendar | cache | monitor | code | data"
+    - source_path: "URL, path, connection string"
+    - parser:      "markdown | json | jsonl | yaml | csv | html | sql | graphql | pdf | rss | cypher | binary"
+  optional:
+    - protocol:        "Protocole réseau"
+    - driver:          "Driver spécifique (neo4j, qdrant, postgres, redis, k8s...)"
+    - targets:         "Destinations: qdrant:collection | neo4j:label | pb:collection"
+    - auth_mode:       "none | bearer | basic | oauth2 | apikey | ssh | mtls"
+    - auth_secret_ref: "Nom de la variable d'environnement contenant le secret"
+    - sync_schedule:   "Cron expression"
+    - sync_status:     "idle | running | error | ok"
+    - description:     "Description humaine"
+
+# ── Contrat de UI Schema ──────────────────────────────────────────────────────
+ui_schema:
+  required:
+    - page:    "Identifiant de page"
+    - title:   "Titre lisible"
+    - intent:  "Intention sémantique (réduire dispersion, voir OKR...)"
+    - layout:  "Type de layout (dashboard, list, detail, form)"
+    - widgets: "Liste de widgets invariants"
+  widget:
+    required:
+      - id:     "Identifiant unique dans la page"
+      - type:   "Type de widget (parmi les invariants autorisés)"
+      - title:  "Titre affiché"
+      - source: "Endpoint API fournissant les données"
+    optional:
+      - span:   "Nombre de colonnes (1-12)"
+      - filter: "Filtre appliqué à la source"
+      - actions: "Actions disponibles dans le widget"
+
+# ── Widgets invariants autorisés ──────────────────────────────────────────────
+invariant_widgets:
+  - priority_card       # Priorité du jour / P0
+  - okr_progress        # Progression OKR + KRs
+  - blocker_map         # Blocages détectés via Neo4j
+  - victory_timeline    # Victoires récentes
+  - action_list         # Prochaines actions recommandées
+  - journal_editor      # Éditeur journal quotidien (Markdown)
+  - graph_view          # Vue graphe Neo4j (concepts, relations)
+  - decision_matrix     # Matrice de décision
+  - calendar_view       # Vue calendrier (deadlines, events)
+  - focus_timer         # Timer Pomodoro
+  - data_gate_status    # Statut des Data Gates (type, sync, targets)
+  - agent_run_trace     # Trace d'exécution d'un agent
+  - metric_widget       # Métrique temps réel avec graphe
+  - search_results      # Résultats de recherche sémantique Qdrant
+
+# ── Meta-IR (Représentation Intermédiaire) ────────────────────────────────────
+meta_ir:
+  description: >
+    Représentation intermédiaire obligatoire entre toute intention et toute action.
+    Jamais : Intention → code direct.
+    Toujours : Intention → Meta-IR → Structure → Substance → Runtime → UI/API.
+
+  structure:
+    intention:  "Ce que l'utilisateur veut accomplir (langage naturel)"
+    context:    "Données disponibles (Neo4j, Qdrant, PocketBase)"
+    constraints: "Invariants P0 applicables"
+    target:     "Entité ou schéma à produire"
+    output_type: "ui_schema | workflow | data_gate | agent | okr | task"
+    validation: "JSON Schema ou Zod schema validant le résultat"
+    reversible: "true | false — si false, HITL requis"

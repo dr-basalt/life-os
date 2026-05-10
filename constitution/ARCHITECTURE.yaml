@@ -1,0 +1,160 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — Architecture Cible
+# Shape global imposé. Pas négociable.
+# Chaque couche a un rôle précis. Pas d'overlap, pas de direct coupling.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Stack actuelle (v0.x) ─────────────────────────────────────────────────────
+current:
+  frontend:
+    tech: "SvelteKit + TailwindCSS"
+    url: "https://stern-os.ori3com.cloud"
+    role: "Renderer de UI Schemas. Composants invariants uniquement."
+    container: sternos-frontend
+
+  backend:
+    tech: "PocketBase v0.22 (SQLite + REST + Admin)"
+    url: "https://api.stern-os.ori3com.cloud"
+    role: "State applicatif — OKRs, tasks, victories, data_gates, onboarding"
+    container: sternos-pb
+    replication: "Litestream → Hetzner S3"
+
+  agent_runtime:
+    tech: "SOMA (Hono.js, LLM-agnostic, OpenAI-compatible)"
+    url: "https://soma.stern-os.ori3com.cloud"
+    role: "Runtime agentique embarqué. 11 tools. Constitution YAML."
+    container: sternos-soma
+    llm: "gpt-4o-mini via OpenAI API"
+
+  mcp_server:
+    tech: "Hono.js Node.js"
+    url: "https://mcp.stern-os.ori3com.cloud"
+    role: "14 tools MCP: persona, OKRs, semantic_search, data_gates SCRUD"
+    container: sternos-mcp
+    version: "1.2.0"
+
+  knowledge_graph:
+    tech: "Neo4j 5.x"
+    role: "Graphe cognitif — User, Douleurs, Patterns, Désirs, P0, OKRs, Insights"
+    connection: "bolt://172.17.0.1:7687"
+    seeded: true
+
+  vector_db:
+    tech: "Qdrant v1.9.2"
+    role: "Embeddings sémantiques — collections: insights, okrs, blueprint"
+    connection: "http://sternos-qdrant:6333"
+    container: sternos-qdrant
+
+  workflow_engine:
+    tech: "Windmill"
+    url: "https://flows.stern-os.ori3com.cloud"
+    role: "Orchestration flows, cron jobs, sync pipelines"
+    container: sternos-windmill
+
+  reverse_proxy:
+    tech: "Traefik v3"
+    role: "TLS, routing, Let's Encrypt"
+    container: sternos-traefik
+
+  infra:
+    paas: "Coolify self-hosted — http://128.140.115.220:8000"
+    server: "stern-os-brain — 46.224.111.203"
+    runtime: "Docker Compose"
+    gitops: "GitHub → git pull → make deploy"
+
+# ── Architecture cible (v1.0) ─────────────────────────────────────────────────
+target:
+  frontend:
+    tech: "Next.js ou Astro + React + TailwindCSS + shadcn/ui"
+    pattern: "UI Schema Registry → invariant components renderer"
+    note: "Migration progressive depuis SvelteKit. Même invariants."
+
+  meta_backend:
+    tech: "Fastify TypeScript + Zod + OpenAPI"
+    role: "API Gateway — auth, RBAC, tenant context, config runtime"
+    note: "Remplace progressivement PocketBase pour la logique métier"
+
+  state_db:
+    primary: "PocketBase (v0.x) → PostgreSQL (v1.0)"
+    note: "Migration Prisma/Drizzle quand multi-tenant requis"
+
+  agent_runtime:
+    tech: "LangGraph (workflows) + LiteLLM (routing)"
+    role: "Multi-agent: Coach, Architect, UI Designer, Reviewer, Executor"
+    observability: "Langfuse traces + costs"
+    note: "SOMA reste en v0.x. LangGraph arrive en v0.5"
+
+  knowledge:
+    graph: "Neo4j — persona, concepts, relations, invariants"
+    vector: "Qdrant — embeddings, RAG, semantic search"
+    metadata: "Directus ou PocketBase Admin"
+
+  ai_gateway:
+    tech: "LiteLLM"
+    role: "Router multi-provider: OpenAI, Anthropic, OpenRouter, Ollama, custom"
+
+  workflow_engine:
+    tech: "Temporal (v1.0) ou n8n (v0.x)"
+    role: "Orchestration durable, retry, compensation"
+
+  gitops:
+    source: "GitHub (current) → GitLab (target)"
+    ci_cd: "ArgoCD ou Coolify"
+    iac: "Terraform (infra) + Helm (k8s)"
+
+  observability:
+    llm_traces: "Langfuse"
+    infra: "OpenTelemetry + Prometheus"
+    logs: "Loki ou CloudWatch"
+
+# ── Couches système ───────────────────────────────────────────────────────────
+planes:
+  control_plane:
+    description: "Mission, objectifs, OKR, règles, invariants, runtime config"
+    components: [constitution, okr_engine, hitl_contract, agent_registry]
+
+  data_plane:
+    description: "Notes, documents, fichiers, API, tâches, calendrier, journaux"
+    components: [data_gate_registry, ingestion_pipeline, parser_registry]
+
+  knowledge_plane:
+    description: "Neo4j + Qdrant + PostgreSQL/PocketBase"
+    components: [neo4j_persona, qdrant_vectors, pocketbase_state]
+
+  execution_plane:
+    description: "Agents, workflows, MCP, n8n/Windmill, appels API"
+    components: [soma_runtime, mcp_server, windmill, langgraph]
+
+  experience_plane:
+    description: "UI générées par schéma, cockpit, dashboards, vues métier"
+    components: [ui_schema_registry, frontend_renderer, invariant_widgets]
+
+# ── Roadmap versions ──────────────────────────────────────────────────────────
+roadmap:
+  v0.1:
+    status: done
+    delivered: [auth, pocketbase, okr_crud, daily_journal, victory_log, dashboard]
+
+  v0.2:
+    status: done
+    delivered: [data_gate_registry, obsidian_sync, qdrant, mcp_scrud, seed_gates]
+
+  v0.3:
+    status: next
+    target: [neo4j_graph_viewer, entity_extraction_from_vault, concept_relations_ui]
+
+  v0.4:
+    status: planned
+    target: [rag_context_builder, semantic_search_ui, daily_briefing_from_qdrant]
+
+  v0.5:
+    status: planned
+    target: [langgraph_workflows, agent_coach, langfuse_tracing, json_output_validation]
+
+  v0.6:
+    status: planned
+    target: [ui_schema_engine, frontend_renderer, ui_designer_agent, page_synthesis]
+
+  v1.0:
+    status: vision
+    target: [multi_tenant, rbac, billing, marketplace_agents, full_gitops]

@@ -1,0 +1,219 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — Discovery Contract
+# Comment Stern OS découvre toute source de données ou service.
+# Toute source découverte devient une Data Gate enregistrée dans PocketBase.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+discovery:
+  principle: >
+    Avant toute ingestion, le système découvre.
+    Avant toute action, le système scanne.
+    Le résultat d'une découverte est toujours une Data Gate dans le registre.
+    La découverte est idempotente (upsert, jamais duplicate).
+
+  output: "Data Gate enregistrée via MCP create_data_gate ou scripts/seed-gates.js"
+
+# ── Kubernetes ────────────────────────────────────────────────────────────────
+  kubernetes:
+    detection:
+      - kubeconfig_scan: "~/.kube/ — parser YAML, extraire clusters, users, contexts"
+      - env_vars: "KUBECONFIG, K8S_SERVER, K8S_TOKEN"
+    strategy:
+      - kubeconfig_scan
+      - api_introspection:   "GET /api/v1/namespaces, /apis, /api/v1/nodes"
+      - crd_extraction:      "GET /apis/apiextensions.k8s.io/v1/customresourcedefinitions"
+      - workload_inventory:  "Deployments, StatefulSets, Jobs, CronJobs"
+    gate_type: k8s
+    gate_role: compute
+    parser: yaml
+    auth_mode: mtls
+    auth_secret_ref: KUBECONFIG
+
+# ── Git repositories ──────────────────────────────────────────────────────────
+  git:
+    detection:
+      - filesystem_scan: "Find .git/ dirs in ~/cockpit/, ~/projects/, /opt/"
+      - github_api:      "GET /user/repos — lister tous les repos de l'org"
+      - env_vars:        "GH_TOKEN, GITLAB_API_TOKEN"
+    strategy:
+      - repo_scan:        "Liste fichiers, README, package.json, docker-compose"
+      - branch_analysis:  "Branches actives, derniers commits, tags"
+      - dependency_graph: "package.json → imports, go.mod, requirements.txt"
+      - issue_graph:      "Issues ouvertes → douleurs potentielles"
+    gate_type: git
+    gate_role: code
+    parser: markdown
+    auth_mode: bearer
+    auth_secret_ref: GH_TOKEN
+
+# ── Obsidian vault ────────────────────────────────────────────────────────────
+  obsidian:
+    detection:
+      - config_file:   "~/.config/obsidian/obsidian.json — vaults enregistrés"
+      - syncthing:     "Dossiers Syncthing avec 'obsidian' dans le label ou path"
+      - filesystem:    "Dossiers contenant .obsidian/ ou majority .md files"
+    strategy:
+      - markdown_scan:       "Parser tous les .md, extraire frontmatter YAML"
+      - backlink_graph:      "[[liens internes]] → graphe de relations"
+      - semantic_embedding:  "Chunks → OpenAI text-embedding-3-small → Qdrant"
+      - entity_extraction:   "Noms, projets, concepts → Neo4j nodes"
+      - tag_taxonomy:        "#tags → Neo4j labels"
+    gate_type: obsidian
+    gate_role: knowledge_source
+    parser: markdown
+    targets: ["qdrant:insights", "neo4j:notes"]
+    auth_mode: none
+
+# ── REST API ──────────────────────────────────────────────────────────────────
+  api:
+    detection:
+      - env_vars:       "Toute variable *_URL, *_API_URL, *_BASE_URL"
+      - docker_compose: "Services avec labels Traefik → extraire URLs"
+      - config_files:   ".env, config.json, settings.yaml"
+    strategy:
+      - openapi_probe:   "GET /openapi.json, /swagger.json, /api-docs"
+      - health_check:    "GET /health, /healthz, /ping, /status"
+      - version_probe:   "GET /, /version, /api/version"
+      - auth_probe:      "Déterminer auth_mode depuis headers/docs"
+    gate_type: api
+    gate_role: data
+    parser: json
+    auth_mode: bearer
+
+# ── GraphQL ───────────────────────────────────────────────────────────────────
+  graphql:
+    detection:
+      - introspection: "POST /graphql {__schema{types{name}}}"
+      - env_vars:      "*_GRAPHQL_URL, *_GQL_ENDPOINT"
+    strategy:
+      - schema_introspection: "Extraire types, queries, mutations, subscriptions"
+      - type_mapping:         "Types GraphQL → entités Meta-Model"
+    gate_type: graphql
+    gate_role: data
+    parser: graphql
+    auth_mode: bearer
+
+# ── MCP servers ───────────────────────────────────────────────────────────────
+  mcp:
+    detection:
+      - manifest_probe:  "GET / → {name, version, tools}"
+      - claude_config:   "~/.claude/ — mcp configs enregistrés"
+      - env_vars:        "*_MCP_URL"
+    strategy:
+      - tool_inventory:  "Lister tous les tools disponibles"
+      - schema_extract:  "inputSchema de chaque tool → types attendus"
+      - capability_map:  "Tools → rôles dans le système (SCRUDX mapping)"
+    gate_type: mcp
+    gate_role: knowledge_source
+    parser: json
+    auth_mode: none
+
+# ── Databases ─────────────────────────────────────────────────────────────────
+  database:
+    sql:
+      detection:
+        - env_vars:       "DATABASE_URL, *_DB_URL, POSTGRES_*, MYSQL_*"
+        - docker_compose: "Services image postgres, mysql, sqlite"
+      strategy:
+        - schema_introspection: "information_schema.tables, pg_catalog"
+        - entity_mapping:       "Tables → entités Meta-Model"
+      gate_type: sql
+      parser: sql
+      auth_mode: basic
+
+    graph:
+      detection:
+        - env_vars: "NEO4J_URI, NEO4J_URL, BOLT_URL"
+      strategy:
+        - node_labels:    "CALL db.labels()"
+        - relationships:  "CALL db.relationshipTypes()"
+        - schema_map:     "CALL apoc.meta.schema()"
+      gate_type: database
+      driver: neo4j
+      parser: cypher
+      auth_mode: basic
+
+    vector:
+      detection:
+        - env_vars: "QDRANT_URL, QDRANT_HOST"
+      strategy:
+        - collections: "GET /collections"
+        - schema:      "GET /collections/{name} — vectors config, payload schema"
+      gate_type: database
+      driver: qdrant
+      parser: json
+      auth_mode: none
+
+    redis:
+      detection:
+        - env_vars: "REDIS_URL, REDIS_HOST, REDIS_PORT"
+      strategy:
+        - info:    "INFO server, INFO keyspace"
+        - keyspace: "SCAN — catégoriser les clés"
+      gate_type: redis
+      driver: redis
+      parser: json
+
+# ── S3 / Object Storage ───────────────────────────────────────────────────────
+  s3:
+    detection:
+      - env_vars: "S3_ENDPOINT, AWS_*, HETZNER_S3_*, MINIO_*"
+    strategy:
+      - bucket_list: "ListBuckets → inventorier les buckets"
+      - object_scan: "ListObjects → extraire structure de données"
+    gate_type: s3
+    parser: binary
+    auth_mode: apikey
+    auth_secret_ref: S3_KEY
+
+# ── Syncthing ─────────────────────────────────────────────────────────────────
+  syncthing:
+    detection:
+      - config_file: "/data/syncthing/*/config/config.xml"
+      - api:         "GET http://localhost:8384/rest/config/folders"
+      - env_vars:    "SYNCTHING_API_KEY, SYNCTHING_URL"
+    strategy:
+      - folder_inventory: "Parser config.xml → folders (id, label, path, type)"
+      - device_map:       "Devices connectés → peer discovery"
+      - classify:         "Label → type (obsidian, notes, kanban, apk...)"
+    gate_type: syncthing
+    gate_role: storage
+    parser: json
+    auth_mode: apikey
+    auth_secret_ref: SYNCTHING_API_KEY
+
+# ── Coolify (self-hosted) ─────────────────────────────────────────────────────
+  coolify:
+    detection:
+      - config_file: "~/.config/coolify/config.json — instances enregistrées"
+      - default_instance: "fqdn + token du champ default:true"
+    strategy:
+      - api_discovery: "GET /api/v1/servers, /api/v1/applications, /api/v1/services"
+      - service_map:   "Applications → containers → URLs publiques"
+      - env_vars_map:  "Env vars Coolify → secret_refs Data Gates"
+    gate_url: "http://128.140.115.220:8000"
+    gate_type: api
+    gate_role: compute
+    auth_mode: bearer
+    auth_secret_ref: COOLIFY_API_TOKEN
+
+# ── Providers IA ─────────────────────────────────────────────────────────────
+  ai_providers:
+    detection:
+      - env_vars: "OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, LLM_API_KEY, LLM_BASE_URL"
+      - docker_compose: "Services ollama, litellm, vllm"
+    strategy:
+      - model_list:  "GET /v1/models → modèles disponibles"
+      - capabilities: "Chat, embeddings, vision, function_calling"
+    gate_types: [api, ollama]
+    gate_role: ai_provider
+    auth_mode: bearer
+
+# ── Règles de découverte ──────────────────────────────────────────────────────
+rules:
+  - "Toute source découverte est upsertée dans data_gates via seed-gates.js"
+  - "La découverte est idempotente — jamais de doublons"
+  - "Les secrets ne sont jamais stockés — seulement auth_secret_ref"
+  - "Toute gate découverte a enabled=true et sync_status=idle"
+  - "La découverte déclenche automatiquement un sync si role=knowledge_source"
+  - "Toute nouvelle gate est versionnée dans scripts/seed-gates.js + git commit"

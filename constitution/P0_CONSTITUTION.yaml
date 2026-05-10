@@ -1,0 +1,185 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# STERN OS — Constitution Agentique P0
+# Document racine. Invariant. Non négociable.
+# Version: 1.0.0
+# Auteur: dr-basalt / ORI3COM
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Ce document ne décrit pas du code.
+# Il décrit les LOIS qui permettent à Stern OS d'émerger.
+# Tout agent, runtime, workflow, outil doit s'y conformer.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+identity:
+  name: "Stern OS"
+  tagline: "Cognitive Operating System — API-first, AI-driven, GitOps-native"
+  mission: >
+    Transformer les données, objectifs, douleurs et connaissances d'un utilisateur
+    en cockpit d'exécution personnalisé et évolutif.
+    L'utilisateur exprime sa vie. Le système structure, priorise, génère.
+  axiom: "Apprendre à servir les agents pour que les agents puissent servir l'utilisateur."
+
+# ── Philosophie fondatrice ────────────────────────────────────────────────────
+philosophy:
+  - api_first            # Toute fonctionnalité naît d'une API, jamais d'une UI
+  - ai_driven            # L'IA génère la structure, pas l'humain
+  - gitops               # Tout changement passe par git (IaC, config, seed, constitution)
+  - discovery_driven     # Le système découvre son environnement avant d'agir
+  - structure_before_substance  # Modèle de données → UI, jamais l'inverse
+  - no_hardcoded_ui      # Aucune UI fixe : tout est généré depuis un UI Schema validé
+  - evolutionary_architecture   # Le système évolue par accumulation, pas par réécriture
+  - scrudx_everywhere    # Search/Create/Read/Update/Delete/Execute sur toute entité
+  - hitl_governance      # L'humain peut lire, corriger, approuver, bloquer, rollback
+  - reversible_systems   # Toute action doit être réversible ou compensable
+  - infra_as_code        # Toute infra est déclarative, versionnée, reproductible
+  - data_drives_ui       # La UI émerge des données et des douleurs, pas du design
+  - meta_ir_first        # Toute intention passe par une représentation intermédiaire
+  - no_direct_coupling   # Aucun composant ne dépend directement d'un autre sans contrat
+
+# ── Invariants P0 ─────────────────────────────────────────────────────────────
+invariants:
+  - id: INV-01
+    label: "Aucune UI sans modèle de données"
+    rule: >
+      Toute page ou widget doit être rattaché à un schéma JSON validé.
+      Interdiction de générer du HTML/React libre sans passer par le UI Schema Registry.
+
+  - id: INV-02
+    label: "Aucun code écrit par le LLM sans validation de schéma"
+    rule: >
+      Le LLM génère uniquement des schémas (UI Schema, Data Schema, Workflow YAML).
+      Le runtime valide ces schémas avant exécution. Jamais de code UI brut.
+
+  - id: INV-03
+    label: "Toute action destructive requiert validation humaine"
+    rule: >
+      Toute opération DELETE, reset, purge, push force, suppression de volume
+      doit passer par le HITL Contract avant exécution.
+
+  - id: INV-04
+    label: "Toute source de données est une Data Gate"
+    rule: >
+      Aucune connexion directe hardcodée à une base, API ou fichier.
+      Toute source doit être enregistrée dans le Data Gate Registry avec type,
+      rôle, auth_mode, parser, targets, sync_schedule.
+
+  - id: INV-05
+    label: "Tout pipeline passe par git"
+    rule: >
+      IA → édition fichier → git commit → git push → deploy via SSH/Makefile.
+      Aucun docker exec inline non versionné. Aucun script éphémère.
+
+  - id: INV-06
+    label: "Meta-IR obligatoire"
+    rule: >
+      Intention → Meta-IR → Structure → Substance → Runtime → UI/API.
+      Jamais : Intention → code direct.
+
+  - id: INV-07
+    label: "Tout est SCRUDX-able"
+    rule: >
+      Toute entité (agent, workflow, gate, OKR, widget, tool, schema)
+      doit exposer Search/Create/Read/Update/Delete/Execute via MCP ou API.
+
+  - id: INV-08
+    label: "Pas de secret en clair"
+    rule: >
+      Les secrets ne sont jamais stockés dans le code, les scripts ou les seeds.
+      Seul le nom de la variable d'environnement (secret_ref) est versionné.
+
+# ── Forbidden ─────────────────────────────────────────────────────────────────
+forbidden:
+  - hardcoded_business_logic     # Aucune règle métier en dur dans le code
+  - direct_coupling              # Aucun import direct entre services sans contrat API
+  - ui_without_data_model        # Aucune UI sans schéma JSON validé en amont
+  - unmanaged_state              # Tout état doit être persisté dans PocketBase, Neo4j ou Qdrant
+  - opaque_generation            # Toute génération LLM doit être loggée, tracée, observable
+  - inline_docker_exec           # Pas de docker exec inline non versionné
+  - secrets_in_code              # Jamais de clé API, token ou password dans le code/git
+  - local_docker_commands        # Aucun docker/compose lancé localement (sauf dev-up)
+  - breaking_migrations          # Les migrations PocketBase sont additives, jamais destructives
+
+# ── Lifecycle ─────────────────────────────────────────────────────────────────
+lifecycle:
+  steps:
+    - discover          # Scanner l'environnement, registrer les Data Gates
+    - extract_structure # Extraire schémas, entités, relations depuis les sources
+    - create_p0         # Créer les invariants, constitution, meta-model
+    - feed_substance    # Peupler Neo4j, Qdrant, PocketBase via Data Gates
+    - generate_p1       # Générer UI Schemas, workflows, agents via SOMA/MCP
+    - validate          # Valider les schémas générés (Zod, JSON Schema)
+    - observe           # Traces Langfuse, métriques Qdrant, logs MCP
+    - iterate           # Ajuster via OKR Engine → recommencer depuis discover
+
+  gitops_pipeline: |
+    Intention
+    → edit file (IA)
+    → git commit
+    → git push
+    → make deploy (SSH → stern-os-brain)
+    → docker compose build + up
+    → [seed/fix si migration]
+    → observe (make health)
+    → iterate
+
+# ── Runtime reasoning ─────────────────────────────────────────────────────────
+runtime:
+  reasoning:
+    - reverse_causal_reasoning   # Partir du résultat désiré, remonter aux causes
+    - recursive_bootstrapping    # Le système se construit lui-même via ses propres primitives
+    - any_format_discovery       # Toute source peut être découverte quel que soit son format
+    - meta_ir_first              # Représentation intermédiaire avant toute action
+    - scrudx_by_default          # Toute entité est SCRUDX-able par défaut
+    - constitution_first         # Consulter P0_CONSTITUTION.yaml avant toute décision
+
+  constitution_path: "/opt/stern-os/constitution/P0_CONSTITUTION.yaml"
+  meta_model_path:   "/opt/stern-os/constitution/META_MODEL.yaml"
+  architecture_path: "/opt/stern-os/constitution/ARCHITECTURE.yaml"
+  discovery_path:    "/opt/stern-os/constitution/DISCOVERY_CONTRACT.yaml"
+
+# ── Stop conditions ───────────────────────────────────────────────────────────
+stop_conditions:
+  - okr_reached          # Tous les KRs d'un OKR atteignent leur cible
+  - scorecard_green      # Tous les scorecards dans le vert
+  - human_validation     # dr-basalt approuve explicitement
+  - error_budget_exceeded # Trop d'erreurs → HITL obligatoire
+
+# ── Gouvernance HITL ──────────────────────────────────────────────────────────
+hitl:
+  surfaces:
+    - read:     "Lire toute décision, log, schéma généré"
+    - modify:   "Modifier tout fichier, schéma, config via git"
+    - correct:  "Corriger les outputs LLM avant validation"
+    - approve:  "Approuver explicitement les actions irréversibles"
+    - block:    "Bloquer toute action à tout moment"
+    - annotate: "Annoter les insights, patterns, décisions"
+    - trigger:  "Déclencher manuellement tout workflow ou agent"
+    - rollback: "Rollback vers tout état git précédent"
+    - override: "Override toute règle avec justification documentée"
+
+  required_for:
+    - delete_operations
+    - production_changes
+    - credential_updates
+    - schema_breaking_changes
+    - external_message_send
+    - agent_spawn
+
+# ── Surfaces d'exposition ─────────────────────────────────────────────────────
+surfaces:
+  rest:
+    base_url: "https://api.stern-os.ori3com.cloud"
+    auth: bearer_token
+  mcp:
+    base_url: "https://mcp.stern-os.ori3com.cloud"
+    version: "1.2.0"
+    tools: 14
+  agent_runtime:
+    base_url: "https://soma.stern-os.ori3com.cloud"
+    protocol: openai_compatible
+  frontend:
+    base_url: "https://stern-os.ori3com.cloud"
+    renderer: svelte_invariant_widgets
+  cli:
+    entrypoint: "make"
+    makefile: "/opt/stern-os/Makefile"
