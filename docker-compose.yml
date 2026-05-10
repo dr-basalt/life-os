@@ -232,33 +232,35 @@ services:
       start_period: 60s
 
   # ─── Next.js + Payload — cockpit applicatif SternOS ──────────────────────
-  # Note: container sternos-next buildé depuis app/ (Next.js 15 + Payload v3)
-  # Déployé en Phase 3 — app/ directory pas encore créé
-  # sternos-next:
-  #   build: ./app
-  #   container_name: sternos-next
-  #   restart: unless-stopped
-  #   environment:
-  #     DATABASE_URI: postgresql://${POSTGRES_USER:-sternos}:${POSTGRES_PASSWORD}@sternos-postgres:5432/${POSTGRES_DB:-sternos}?schema=payload
-  #     PAYLOAD_SECRET: ${PAYLOAD_SECRET}
-  #     DIRECTUS_URL: http://sternos-directus:8055
-  #     DIRECTUS_ADMIN_TOKEN: ${DIRECTUS_ADMIN_TOKEN}
-  #     NEO4J_URI: bolt://${NEO4J_HOST:-172.19.0.2}:7687
-  #     NEO4J_PASSWORD: ${NEO4J_PASSWORD:-SternOS2026xNeo4j}
-  #     QDRANT_URL: http://sternos-qdrant:6333
-  #     MCP_URL: http://sternos-mcp:3001
-  #     NEXT_PUBLIC_MCP_URL: https://mcp.${DOMAIN}
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     directus:
-  #       condition: service_healthy
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.next.rule=Host(`app.${DOMAIN}`)"
-  #     - "traefik.http.routers.next.entrypoints=websecure"
-  #     - "traefik.http.routers.next.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.next.loadbalancer.server.port=3000"
+  sternos-next:
+    build: ./app
+    container_name: sternos-next
+    restart: unless-stopped
+    environment:
+      DATABASE_URI: postgresql://${POSTGRES_USER:-sternos}:${POSTGRES_PASSWORD}@sternos-postgres:5432/${POSTGRES_DB:-sternos}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:-sternos-payload-secret-change-in-prod}
+      DIRECTUS_URL: http://sternos-directus:8055
+      DIRECTUS_ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL:-admin@ori3com.cloud}
+      DIRECTUS_ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD:-}
+      NEO4J_URI: bolt://${NEO4J_HOST:-172.19.0.2}:7687
+      NEO4J_HTTP_URL: http://${NEO4J_HOST:-172.19.0.2}:7474
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-SternOS2026xNeo4j}
+      QDRANT_URL: http://sternos-qdrant:6333
+      MCP_URL: http://sternos-mcp:3001
+      NEXT_PUBLIC_MCP_URL: https://mcp.${DOMAIN}
+      NEXT_PUBLIC_APP_URL: https://app.${DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      directus:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.next.rule=Host(`app.${DOMAIN}`)"
+      - "traefik.http.routers.next.entrypoints=websecure"
+      - "traefik.http.routers.next.tls.certresolver=letsencrypt"
+      - "traefik.http.services.next.loadbalancer.server.port=3000"
 
 volumes:
   pb_data:
