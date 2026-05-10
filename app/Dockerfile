@@ -12,9 +12,13 @@ RUN npm run build
 
 FROM base AS runner
 ENV NODE_ENV=production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/payload.config.ts ./payload.config.ts
+COPY --from=builder /app/src ./src
+COPY package*.json ./
+COPY next.config.ts ./
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node_modules/.bin/payload migrate 2>/dev/null || true && node_modules/.bin/next start"]
