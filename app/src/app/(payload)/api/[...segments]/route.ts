@@ -1,9 +1,17 @@
-import { REST_DELETE, REST_GET, REST_OPTIONS, REST_PATCH, REST_POST, REST_PUT } from '@payloadcms/next/routes'
-import config from '@payload-config'
+import { handlePayload } from '@payloadcms/next/utilities'
+import { NextRequest } from 'next/server'
+import configPromise from '@payload-config'
 
-export const GET = REST_GET(config)
-export const POST = REST_POST(config)
-export const DELETE = REST_DELETE(config)
-export const PATCH = REST_PATCH(config)
-export const PUT = REST_PUT(config)
-export const OPTIONS = REST_OPTIONS(config)
+type Params = Promise<{ segments: string[] }>
+
+async function handler(req: NextRequest, { params }: { params: Params }) {
+  const resolvedParams = await params
+  return handlePayload(req, configPromise, resolvedParams.segments)
+}
+
+export const GET = handler
+export const POST = handler
+export const DELETE = handler
+export const PATCH = handler
+export const PUT = handler
+export const OPTIONS = handler
